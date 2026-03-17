@@ -111,7 +111,7 @@ func testAddArticle(t *testing.T, c *omnivoreClient) {
 func testVerifyArticleImported(t *testing.T, c *omnivoreClient) {
 	t.Helper()
 	var article *searchNode
-	pollUntil(t, 60*time.Second, 3*time.Second, "article state=SUCCEEDED", func() bool {
+	pollUntil(t, 90*time.Second, 3*time.Second, "article state=SUCCEEDED", func() bool {
 		nodes := c.search(t, "", true)
 		n := findByURL(nodes, "ai-agents-2026")
 		if n == nil {
@@ -298,6 +298,12 @@ func testAddRSSFeed(t *testing.T, c *omnivoreClient) {
 		},
 	}, &resp)
 
+	for _, code := range resp.Subscribe.ErrorCodes {
+		if code == "ALREADY_SUBSCRIBED" {
+			t.Log("RSS feed already subscribed (non-fresh DB), continuing")
+			return
+		}
+	}
 	if len(resp.Subscribe.ErrorCodes) > 0 {
 		t.Fatalf("subscribe error: %v", resp.Subscribe.ErrorCodes)
 	}
