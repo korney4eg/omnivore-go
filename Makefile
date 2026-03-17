@@ -34,6 +34,18 @@ deploy_up:
 deploy_down:
 	docker compose -f $(DEPLOY_DIR)/docker-compose.yml --env-file $(DEPLOY_DIR)/.env down -v --remove-orphans
 
+# ── Dev stack ───────────────────────────────────────────────────────────────
+
+DEV_DIR ?= dev
+
+# Bring up the dev stack (builds content-fetcher from local Dockerfile).
+dev_up:
+	docker compose -f $(DEV_DIR)/docker-compose.yml --env-file $(DEV_DIR)/.env up -d --build
+
+# Tear down the dev stack and wipe all volumes (clean state).
+dev_down:
+	docker compose -f $(DEV_DIR)/docker-compose.yml --env-file $(DEV_DIR)/.env down -v --remove-orphans
+
 # ── Testsite ────────────────────────────────────────────────────────────────
 
 # Build the EN-only Hugo static site into testsite/public/ and start the nginx
@@ -60,6 +72,7 @@ test_integration:
 
 # Reset the deploy stack (wipes DB + volumes) then run integration tests.
 # Use this for a guaranteed clean run; test_integration works on dirty DB too.
+# To test against dev stack: make test_integration_clean DEPLOY_DIR=dev OMNIVORE_URL=http://omnivore-dev
 test_integration_clean: deploy_down deploy_up
 	@echo "Waiting 30s for stack to initialise..."
 	@sleep 30

@@ -23,6 +23,8 @@ Convenience targets are defined in the `Makefile`:
 | `make docker_push_content_fetcher` | Build and push (`REGISTRY` and `IMAGE_TAG` are overridable) |
 | `make deploy_up` | Bring up the reference deploy stack |
 | `make deploy_down` | Tear down the stack and wipe all volumes |
+| `make dev_up` | Build content-fetcher from local Dockerfile and bring up dev stack |
+| `make dev_down` | Tear down the dev stack and wipe all volumes |
 | `make test_integration` | Run integration tests (deploy stack must be running) |
 | `make test_integration_clean` | Reset stack + run integration tests (guaranteed clean DB) |
 | `make testsite_start` | Build Hugo static site and start testsite nginx manually |
@@ -49,23 +51,26 @@ All configuration is provided via environment variables. Copy `.env` from the re
 
 ## Running the deploy stack
 
-`make deploy_up` / `make deploy_down` are the convenience wrappers. Directly:
+There are two stacks:
+
+| Stack | Folder | Hostname | content-fetcher |
+|---|---|---|---|
+| `deploy` | `deploy/` | `omnivore-deploy` | published image `korney4eg/omnivore-content-fetcher` |
+| `dev` | `dev/` | `omnivore-dev` | built from local `docker/content-fetcher.Dockerfile` |
 
 ```bash
-cd deploy && docker compose up -d       # bring up
-cd deploy && docker compose down -v     # tear down (wipes volumes)
+make deploy_up    # bring up deploy stack
+make deploy_down  # tear down + wipe volumes
+
+make dev_up       # build content-fetcher locally and bring up dev stack
+make dev_down     # tear down + wipe volumes
 ```
 
-The `deploy/` folder contains:
-- `docker-compose.yml` — reference stack using pre-built images; `content-fetch` uses the published `korney4eg/omnivore-content-fetcher` image (not the local build)
-- `.env` — environment config for the whole stack (gitignored; must be created manually)
-- `setup_db.bash` must exist at the **repository root** — it is mounted into the migrate container at startup to initialise the database schema
+Both folders have their own `.env` (gitignored). The `dev/.env` is derived from `deploy/.env` with all `omnivore-deploy` references replaced by `omnivore-dev`. `SERVER_BASE_URL` must always be `http://omnivore-api:8080` (internal Docker URL, not the public hostname).
 
-Key `.env` values to set manually after copying the template:
-- `MQ_REDIS_URL=redis://redis:6379/0` — required for BullMQ; without it the API logs `no redisURL supplied: mq`
-- `SERVER_BASE_URL=http://omnivore-api:8080` — internal Docker URL (NOT the public hostname)
+Both stacks require `/etc/hosts` entries: `127.0.0.1 omnivore-deploy` and `127.0.0.1 omnivore-dev`.
 
-All services in `deploy/docker-compose.yml` that need to reach the test site (omnivore-api, queue-processor, content-fetch) have `extra_hosts: ["omnivore-testsite:host-gateway"]` so they can resolve the hostname to the Docker host.
+The `setup_db.bash` at the **repository root** is mounted into the migrate container to initialise the schema and demo user (`demo@omnivore.work` / `demo_password`).
 
 ## Integration tests
 
