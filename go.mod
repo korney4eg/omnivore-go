@@ -25,7 +25,8 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.30.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.55.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.55.0 // indirect
-	github.com/PuerkitoBio/goquery v1.8.0 // indirect
+	github.com/JohannesKaufmann/html-to-markdown v1.6.0 // indirect
+	github.com/PuerkitoBio/goquery v1.9.2 // indirect
 	github.com/alicebob/miniredis/v2 v2.37.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect

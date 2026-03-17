@@ -107,10 +107,27 @@ func (w *Worker) processJob(job *bullmq.RawJob) {
 		err = jobs.HandleRefreshFeed(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
 	case "refresh-all-feeds":
 		err = jobs.HandleRefreshAllFeeds(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
-	case "trigger-rule", "find-thumbnail",
-		"call-webhook", "prune-trash", "expire-folders", "upload-content",
-		"sync-read-positions", "update-labels", "update-highlight", "bulk-action",
-		"ai-summarize", "send-email", "export", "update-home", "create-digest":
+	case "trigger-rule":
+		err = jobs.HandleTriggerRule(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "find-thumbnail":
+		err = jobs.HandleFindThumbnail(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "call-webhook":
+		err = jobs.HandleCallWebhook(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "prune-trash":
+		err = jobs.HandlePruneTrash(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "expire-folders":
+		err = jobs.HandleExpireFolders(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "upload-content":
+		err = jobs.HandleUploadContent(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "sync-read-positions":
+		err = jobs.HandleSyncReadPositions(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "update-labels":
+		err = jobs.HandleUpdateLabels(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "update-highlight":
+		err = jobs.HandleUpdateHighlight(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "bulk-action":
+		err = jobs.HandleBulkAction(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "ai-summarize", "send-email", "export", "update-home", "create-digest":
 		log.Printf("[queue-processor] job %q not yet implemented, skipping", job.Name)
 	default:
 		log.Printf("[queue-processor] unknown job %q, skipping", job.Name)

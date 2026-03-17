@@ -88,7 +88,36 @@ func (c *Client) UploadContent(ctx context.Context, filePath, content string) er
 	return nil
 }
 
-// DownloadContent downloads a blob at the given path and returns it as a string.
+// UploadBytes uploads raw bytes to the bucket at filePath with the given Content-Type.
+// A 30-second write timeout is applied.
+func (c *Client) UploadBytes(ctx context.Context, filePath string, content []byte, contentType string) error {
+	writeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	w, err := c.bucket.NewWriter(writeCtx, filePath, &blob.WriterOptions{
+		ContentType: contentType,
+	})
+	if err != nil {
+		return fmt.Errorf("new blob writer %s: %w", filePath, err)
+	}
+
+	if _, err := w.Write(content); err != nil {
+		_ = w.Close()
+		return fmt.Errorf("write blob %s: %w", filePath, err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("close blob writer %s: %w", filePath, err)
+	}
+
+	log.Printf("Uploaded %d bytes to %s (%s)", len(content), filePath, contentType)
+	return nil
+}
+
+
 func (c *Client) DownloadContent(ctx context.Context, path string) (string, error) {
 	r, err := c.bucket.NewReader(ctx, path, nil)
 	if err != nil {
