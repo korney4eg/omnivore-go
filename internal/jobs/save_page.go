@@ -15,12 +15,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/omnivore-app/omnivore/internal/config"
+	"github.com/omnivore-app/omnivore/internal/db"
 	"github.com/omnivore-app/omnivore/internal/redisutil"
 	"github.com/omnivore-app/omnivore/internal/storage"
 )
 
 // DBQuerier is the minimal database interface required by save-page.
-// *db.Pool (which wraps *pgxpool.Pool) satisfies this interface.
+// pgx.Tx satisfies this interface.
 type DBQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
@@ -59,12 +60,38 @@ type cachePayload struct {
 	Content  string `json:"content"`
 }
 
-// HandleSavePage processes a save-page job from the backend queue.
+// HandleSavePageWithUpsert allows tests to inject a mock upsert function.
+func HandleSavePageWithUpsert(
+	ctx context.Context,
+	cfg *config.Config,
+	redisDS *redisutil.RedisDataSource,
+	upsert func(ctx context.Context, item LibraryItem) error,
+	rawData json.RawMessage,
+) error {
+	return handleSavePageImpl(ctx, cfg, redisDS, upsert, rawData)
+}
+
+// HandleSavePage is the production entry point with RLS-aware AuthTrx.
 func HandleSavePage(
 	ctx context.Context,
 	cfg *config.Config,
 	redisDS *redisutil.RedisDataSource,
-	dbq DBQuerier,
+	dbPool *db.Pool,
+	rawData json.RawMessage,
+) error {
+	return handleSavePageImpl(ctx, cfg, redisDS, func(ctx context.Context, item LibraryItem) error {
+		return dbPool.AuthTrx(ctx, item.UserID, func(tx pgx.Tx) error {
+			return upsertLibraryItem(ctx, tx, item)
+		})
+	}, rawData)
+}
+
+// handleSavePageImpl contains the main logic with injectable upsert.
+func handleSavePageImpl(
+	ctx context.Context,
+	cfg *config.Config,
+	redisDS *redisutil.RedisDataSource,
+	upsert func(ctx context.Context, item LibraryItem) error,
 	rawData json.RawMessage,
 ) error {
 	var data SavePageData
@@ -148,7 +175,7 @@ func HandleSavePage(
 	slug := makeSlug(title)
 
 	// 5. Upsert into omnivore.library_item.
-	if err := upsertLibraryItem(ctx, dbq, libraryItem{
+	if err := upsert(ctx, LibraryItem{
 		ID:              data.ArticleSavingRequestID,
 		UserID:          data.UserID,
 		Slug:            slug,
@@ -235,8 +262,8 @@ func contentBlobPath(data *SavePageData) string {
 	return fmt.Sprintf("content/%s/%s.%d.original", data.UserID, data.ArticleSavingRequestID, savedAtMs)
 }
 
-// libraryItem holds the fields needed for the upsert.
-type libraryItem struct {
+// LibraryItem holds the fields needed for the upsert.
+type LibraryItem struct {
 	ID              string
 	UserID          string
 	Slug            string
@@ -256,7 +283,7 @@ type libraryItem struct {
 	SiteName        string
 }
 
-func upsertLibraryItem(ctx context.Context, dbq DBQuerier, item libraryItem) error {
+func upsertLibraryItem(ctx context.Context, dbq DBQuerier, item LibraryItem) error {
 	// Check if item exists.
 	var existingID string
 	err := dbq.QueryRow(ctx,

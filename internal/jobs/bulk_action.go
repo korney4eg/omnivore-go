@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/omnivore-app/omnivore/internal/config"
 	"github.com/omnivore-app/omnivore/internal/db"
 	"github.com/omnivore-app/omnivore/internal/redisutil"
@@ -156,11 +157,17 @@ func bulkArchive(ctx context.Context, dbPool *db.Pool, userID string, f bulkFilt
 			  WHERE user_id = $1 %s AND state NOT IN ('ARCHIVED','DELETED')
 			  LIMIT $%d
 			)`, extra, n)
-		tag, err := dbPool.Exec(ctx, sql, args...)
-		if err != nil {
+		var rows int64
+		if err := dbPool.AuthTrx(ctx, userID, func(tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx, sql, args...)
+			if err != nil {
+				return err
+			}
+			rows = tag.RowsAffected()
+			return nil
+		}); err != nil {
 			return fmt.Errorf("bulk-archive: %w", err)
 		}
-		rows := tag.RowsAffected()
 		processed += int(rows)
 		if rows == 0 {
 			break
@@ -189,11 +196,17 @@ func bulkDelete(ctx context.Context, dbPool *db.Pool, userID string, f bulkFilte
 			  WHERE user_id = $1 %s AND state != 'DELETED'
 			  LIMIT $%d
 			)`, extra, n)
-		tag, err := dbPool.Exec(ctx, sql, args...)
-		if err != nil {
+		var rows int64
+		if err := dbPool.AuthTrx(ctx, userID, func(tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx, sql, args...)
+			if err != nil {
+				return err
+			}
+			rows = tag.RowsAffected()
+			return nil
+		}); err != nil {
 			return fmt.Errorf("bulk-delete: %w", err)
 		}
-		rows := tag.RowsAffected()
 		processed += int(rows)
 		if rows == 0 {
 			break
@@ -224,11 +237,17 @@ func bulkMarkAsRead(ctx context.Context, dbPool *db.Pool, userID string, f bulkF
 			  WHERE user_id = $1 %s
 			  LIMIT $%d
 			)`, extra, n)
-		tag, err := dbPool.Exec(ctx, sql, args...)
-		if err != nil {
+		var rows int64
+		if err := dbPool.AuthTrx(ctx, userID, func(tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx, sql, args...)
+			if err != nil {
+				return err
+			}
+			rows = tag.RowsAffected()
+			return nil
+		}); err != nil {
 			return fmt.Errorf("bulk-mark-as-read: %w", err)
 		}
-		rows := tag.RowsAffected()
 		processed += int(rows)
 		if rows == 0 {
 			break
@@ -257,11 +276,17 @@ func bulkMarkAsSeen(ctx context.Context, dbPool *db.Pool, userID string, f bulkF
 			  WHERE user_id = $1 %s
 			  LIMIT $%d
 			)`, extra, n)
-		tag, err := dbPool.Exec(ctx, sql, args...)
-		if err != nil {
+		var rows int64
+		if err := dbPool.AuthTrx(ctx, userID, func(tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx, sql, args...)
+			if err != nil {
+				return err
+			}
+			rows = tag.RowsAffected()
+			return nil
+		}); err != nil {
 			return fmt.Errorf("bulk-mark-as-seen: %w", err)
 		}
-		rows := tag.RowsAffected()
 		processed += int(rows)
 		if rows == 0 {
 			break
@@ -292,11 +317,17 @@ func bulkMoveToFolder(ctx context.Context, dbPool *db.Pool, userID string, f bul
 			  WHERE user_id = $1 %s
 			  LIMIT $%d
 			)`, nFolder, extra, nLimit)
-		tag, err := dbPool.Exec(ctx, sql, args...)
-		if err != nil {
+		var rows int64
+		if err := dbPool.AuthTrx(ctx, userID, func(tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx, sql, args...)
+			if err != nil {
+				return err
+			}
+			rows = tag.RowsAffected()
+			return nil
+		}); err != nil {
 			return fmt.Errorf("bulk-move-to-folder: %w", err)
 		}
-		rows := tag.RowsAffected()
 		processed += int(rows)
 		if rows == 0 {
 			break
@@ -325,42 +356,42 @@ func bulkAddLabels(ctx context.Context, dbPool *db.Pool, userID string, f bulkFi
 			WHERE user_id = $1 %s
 			LIMIT $%d`, extra, n)
 
-		rows, err := dbPool.Query(ctx, selectSQL, args...)
-		if err != nil {
-			return fmt.Errorf("bulk-add-labels: query items: %w", err)
-		}
-
-		var itemIDs []string
-		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
-				rows.Close()
-				return fmt.Errorf("bulk-add-labels: scan id: %w", err)
+		var count int
+		if err := dbPool.AuthTrx(ctx, userID, func(tx pgx.Tx) error {
+			rows, err := tx.Query(ctx, selectSQL, args...)
+			if err != nil {
+				return fmt.Errorf("query items: %w", err)
 			}
-			itemIDs = append(itemIDs, id)
-		}
-		rows.Close()
-		if rows.Err() != nil {
-			return fmt.Errorf("bulk-add-labels: rows: %w", rows.Err())
-		}
-
-		if len(itemIDs) == 0 {
-			break
-		}
-
-		for _, itemID := range itemIDs {
-			for _, labelID := range labelIDs {
-				if _, err := dbPool.Exec(ctx, `
-					INSERT INTO omnivore.entity_labels (library_item_id, label_id)
-					VALUES ($1, $2) ON CONFLICT DO NOTHING
-				`, itemID, labelID); err != nil {
-					log.Printf("[bulk-action] add label %s to item %s: %v", labelID, itemID, err)
+			var itemIDs []string
+			for rows.Next() {
+				var id string
+				if err := rows.Scan(&id); err != nil {
+					rows.Close()
+					return fmt.Errorf("scan id: %w", err)
+				}
+				itemIDs = append(itemIDs, id)
+			}
+			rows.Close()
+			if rows.Err() != nil {
+				return fmt.Errorf("rows: %w", rows.Err())
+			}
+			for _, itemID := range itemIDs {
+				for _, labelID := range labelIDs {
+					if _, err := tx.Exec(ctx, `
+						INSERT INTO omnivore.entity_labels (library_item_id, label_id)
+						VALUES ($1, $2) ON CONFLICT DO NOTHING
+					`, itemID, labelID); err != nil {
+						log.Printf("[bulk-action] add label %s to item %s: %v", labelID, itemID, err)
+					}
 				}
 			}
+			count = len(itemIDs)
+			return nil
+		}); err != nil {
+			return fmt.Errorf("bulk-add-labels: %w", err)
 		}
-
-		processed += len(itemIDs)
-		if len(itemIDs) < limit {
+		processed += count
+		if count < limit {
 			break
 		}
 	}

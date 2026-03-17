@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/omnivore-app/omnivore/internal/config"
 	"github.com/omnivore-app/omnivore/internal/db"
 	"github.com/omnivore-app/omnivore/internal/redisutil"
@@ -39,26 +40,27 @@ func HandleCallWebhook(ctx context.Context, cfg *config.Config, redisDS *redisut
 
 	eventType := strings.ToUpper(d.Type + "_" + d.Action)
 
-	rows, err := dbPool.Query(ctx, `
-		SELECT id, url, method, content_type
-		FROM omnivore.webhooks
-		WHERE user_id = $1 AND enabled = true AND $2 = ANY(event_types)
-	`, d.UserID, eventType)
-	if err != nil {
-		return fmt.Errorf("call-webhook: query webhooks: %w", err)
-	}
-	defer rows.Close()
-
 	var hooks []webhookRow
-	for rows.Next() {
-		var h webhookRow
-		if err := rows.Scan(&h.ID, &h.URL, &h.Method, &h.ContentType); err != nil {
-			return fmt.Errorf("call-webhook: scan webhook: %w", err)
+	if err := dbPool.AuthTrx(ctx, d.UserID, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			SELECT id, url, method, content_type
+			FROM omnivore.webhooks
+			WHERE user_id = $1 AND enabled = true AND $2 = ANY(event_types)
+		`, d.UserID, eventType)
+		if err != nil {
+			return fmt.Errorf("query webhooks: %w", err)
 		}
-		hooks = append(hooks, h)
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("call-webhook: rows: %w", err)
+		defer rows.Close()
+		for rows.Next() {
+			var h webhookRow
+			if err := rows.Scan(&h.ID, &h.URL, &h.Method, &h.ContentType); err != nil {
+				return fmt.Errorf("scan webhook: %w", err)
+			}
+			hooks = append(hooks, h)
+		}
+		return rows.Err()
+	}); err != nil {
+		return fmt.Errorf("call-webhook: query webhooks: %w", err)
 	}
 
 	for _, h := range hooks {

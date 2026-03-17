@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/omnivore-app/omnivore/internal/config"
@@ -17,32 +15,10 @@ import (
 	"github.com/omnivore-app/omnivore/internal/redisutil"
 )
 
-// mockDB records upsert calls without touching real Postgres.
-type mockDB struct {
-	execSQL  []string
-	execArgs [][]any
-}
-
-func (m *mockDB) QueryRow(_ context.Context, _ string, _ ...any) pgx.Row {
-	// Return ErrNoRows so HandleSavePage always inserts rather than updates.
-	return &mockRow{err: pgx.ErrNoRows}
-}
-
-func (m *mockDB) Exec(_ context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
-	m.execSQL = append(m.execSQL, sql)
-	m.execArgs = append(m.execArgs, args)
-	return pgconn.NewCommandTag("INSERT 0 1"), nil
-}
-
-// mockRow implements pgx.Row for QueryRow.
-type mockRow struct{ err error }
-
-func (r *mockRow) Scan(dest ...any) error { return r.err }
-
-// TestHandleSavePage_FromCache verifies that HandleSavePage:
+// TestHandleSavePage_FromCache verifies that HandleSavePageWithUpsert:
 //  1. Reads HTML from the Redis cache.
 //  2. Parses it with go-readability (title non-empty, word count > 0).
-//  3. Calls Exec on the DB with state = "SUCCEEDED".
+//  3. Calls the upsert function with state = "SUCCEEDED".
 func TestHandleSavePage_FromCache(t *testing.T) {
 	// Start an in-process Redis server.
 	mr, err := miniredis.Run()
@@ -80,8 +56,6 @@ func TestHandleSavePage_FromCache(t *testing.T) {
 		MQClient:    redisClient,
 	}
 
-	mdb := &mockDB{}
-
 	ctx := context.Background()
 	savedAt := time.Now().UTC().Format(time.RFC3339)
 	data := jobs.SavePageData{
@@ -95,37 +69,30 @@ func TestHandleSavePage_FromCache(t *testing.T) {
 	}
 	rawData, _ := json.Marshal(data)
 
-	if err := jobs.HandleSavePage(ctx, cfg, redisDS, mdb, rawData); err != nil {
-		t.Fatalf("HandleSavePage returned error: %v", err)
+	var capturedItem jobs.LibraryItem
+	var upsertCalled bool
+	mockUpsert := func(ctx context.Context, item jobs.LibraryItem) error {
+		capturedItem = item
+		upsertCalled = true
+		return nil
 	}
 
-	// Verify the mock DB received exactly one Exec call (the INSERT).
-	if len(mdb.execSQL) != 1 {
-		t.Fatalf("expected 1 DB Exec call, got %d", len(mdb.execSQL))
+	if err := jobs.HandleSavePageWithUpsert(ctx, cfg, redisDS, mockUpsert, rawData); err != nil {
+		t.Fatalf("HandleSavePageWithUpsert returned error: %v", err)
 	}
 
-	// The INSERT args: $1=id, $2=userId, $3=slug, $4=title, ...
-	// Index 3 is title (0-based), index 8 is wordCount, index 9 is state.
-	args := mdb.execArgs[0]
-	if len(args) < 10 {
-		t.Fatalf("expected ≥10 INSERT args, got %d", len(args))
+	if !upsertCalled {
+		t.Fatal("expected upsert to be called")
 	}
-
-	title, ok := args[3].(string)
-	if !ok || title == "" {
-		t.Errorf("expected non-empty title arg, got %v", args[3])
+	if capturedItem.Title == "" {
+		t.Errorf("expected non-empty title, got empty")
 	}
-
-	wordCount, ok := args[8].(int)
-	if !ok || wordCount <= 0 {
-		t.Errorf("expected word count > 0, got %v", args[8])
+	if capturedItem.WordCount <= 0 {
+		t.Errorf("expected word count > 0, got %d", capturedItem.WordCount)
 	}
-
-	state, ok := args[9].(string)
-	if !ok || state != "SUCCEEDED" {
-		t.Errorf("expected state=SUCCEEDED, got %v", args[9])
+	if capturedItem.State != "SUCCEEDED" {
+		t.Errorf("expected state=SUCCEEDED, got %q", capturedItem.State)
 	}
-
-	t.Logf("save-page: title=%q words=%d state=%s", title, wordCount, state)
+	t.Logf("save-page: title=%q words=%d state=%s", capturedItem.Title, capturedItem.WordCount, capturedItem.State)
 }
 

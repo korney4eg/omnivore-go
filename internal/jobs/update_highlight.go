@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/omnivore-app/omnivore/internal/config"
 	"github.com/omnivore-app/omnivore/internal/db"
 	"github.com/omnivore-app/omnivore/internal/redisutil"
@@ -24,7 +25,8 @@ func HandleUpdateHighlight(ctx context.Context, cfg *config.Config, redisDS *red
 		return fmt.Errorf("update-highlight: unmarshal: %w", err)
 	}
 
-	_, err := dbPool.Exec(ctx, `
+	return dbPool.AuthTrx(ctx, d.UserID, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `
 		UPDATE omnivore.library_item
 		SET highlight_annotations = COALESCE((
 		  SELECT array_agg(COALESCE(annotation, ''))
@@ -33,10 +35,10 @@ func HandleUpdateHighlight(ctx context.Context, cfg *config.Config, redisDS *red
 		), ARRAY[]::TEXT[])
 		WHERE id = $1
 	`, d.LibraryItemID)
-	if err != nil {
-		return fmt.Errorf("update-highlight: exec: %w", err)
-	}
-
-	log.Printf("[update-highlight] updated highlights for item=%s", d.LibraryItemID)
-	return nil
+		if err != nil {
+			return fmt.Errorf("exec: %w", err)
+		}
+		log.Printf("[update-highlight] updated highlights for item=%s", d.LibraryItemID)
+		return nil
+	})
 }

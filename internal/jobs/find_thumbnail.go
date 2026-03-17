@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/net/html"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/omnivore-app/omnivore/internal/config"
 	"github.com/omnivore-app/omnivore/internal/db"
 	"github.com/omnivore-app/omnivore/internal/redisutil"
@@ -35,18 +36,33 @@ func HandleFindThumbnail(ctx context.Context, cfg *config.Config, redisDS *redis
 		return fmt.Errorf("find-thumbnail: unmarshal: %w", err)
 	}
 
+	// Step 1: Fetch current thumbnail and content in AuthTrx.
 	var thumbnail, readableContent string
-	err := dbPool.QueryRow(ctx, `
-		SELECT COALESCE(thumbnail, ''), COALESCE(readable_content, '')
-		FROM omnivore.library_item
-		WHERE id = $1 AND user_id = $2
-	`, d.LibraryItemID, d.UserID).Scan(&thumbnail, &readableContent)
-	if err != nil {
-		// item not found — not an error
+	var itemFound bool
+	if err := dbPool.AuthTrx(ctx, d.UserID, func(tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, `
+			SELECT COALESCE(thumbnail, ''), COALESCE(readable_content, '')
+			FROM omnivore.library_item
+			WHERE id = $1 AND user_id = $2
+		`, d.LibraryItemID, d.UserID).Scan(&thumbnail, &readableContent)
+		if err == pgx.ErrNoRows {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		itemFound = true
+		return nil
+	}); err != nil {
+		return fmt.Errorf("find-thumbnail: query: %w", err)
+	}
+
+	if !itemFound {
 		log.Printf("[find-thumbnail] item=%s not found, skipping", d.LibraryItemID)
 		return nil
 	}
 
+	// Step 2: HTTP processing (outside transaction).
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 
 	// If an existing thumbnail is set, verify it's still accessible.
@@ -65,10 +81,14 @@ func HandleFindThumbnail(ctx context.Context, cfg *config.Config, redisDS *redis
 		}
 	}
 
+	// Step 3: Update thumbnail in AuthTrx.
 	if thumbnail != "" {
-		if _, err := dbPool.Exec(ctx, `
-			UPDATE omnivore.library_item SET thumbnail = $1 WHERE id = $2
-		`, thumbnail, d.LibraryItemID); err != nil {
+		if err := dbPool.AuthTrx(ctx, d.UserID, func(tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, `
+				UPDATE omnivore.library_item SET thumbnail = $1 WHERE id = $2
+			`, thumbnail, d.LibraryItemID)
+			return err
+		}); err != nil {
 			return fmt.Errorf("find-thumbnail: update thumbnail: %w", err)
 		}
 		log.Printf("[find-thumbnail] set thumbnail for item=%s url=%s", d.LibraryItemID, thumbnail)

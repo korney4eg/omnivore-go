@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/omnivore-app/omnivore/internal/config"
@@ -110,7 +111,8 @@ func syncReadKey(ctx context.Context, client *redis.Client, dbPool *db.Pool, key
 		}
 	}
 
-	_, err = dbPool.Exec(ctx, `
+	if err := dbPool.AuthTrx(ctx, userID, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `
 		UPDATE omnivore.library_item
 		SET
 		  reading_progress_top_percent = CASE
@@ -132,7 +134,8 @@ func syncReadKey(ctx context.Context, client *redis.Client, dbPool *db.Pool, key
 		  (reading_progress_highest_read_anchor < $4 OR $4 = 0)
 		)
 	`, libraryItemID, topPercent, bottomPercent, anchorIndex, userID)
-	if err != nil {
+		return err
+	}); err != nil {
 		return fmt.Errorf("update progress: %w", err)
 	}
 

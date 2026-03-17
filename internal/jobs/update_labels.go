@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/omnivore-app/omnivore/internal/config"
 	"github.com/omnivore-app/omnivore/internal/db"
 	"github.com/omnivore-app/omnivore/internal/redisutil"
@@ -24,7 +25,8 @@ func HandleUpdateLabels(ctx context.Context, cfg *config.Config, redisDS *redisu
 		return fmt.Errorf("update-labels: unmarshal: %w", err)
 	}
 
-	_, err := dbPool.Exec(ctx, `
+	return dbPool.AuthTrx(ctx, d.UserID, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `
 		UPDATE omnivore.library_item
 		SET label_names = COALESCE((
 		  SELECT array_agg(DISTINCT l.name)
@@ -35,10 +37,10 @@ func HandleUpdateLabels(ctx context.Context, cfg *config.Config, redisDS *redisu
 		), ARRAY[]::TEXT[])
 		WHERE id = $1
 	`, d.LibraryItemID)
-	if err != nil {
-		return fmt.Errorf("update-labels: exec: %w", err)
-	}
-
-	log.Printf("[update-labels] updated labels for item=%s", d.LibraryItemID)
-	return nil
+		if err != nil {
+			return fmt.Errorf("exec: %w", err)
+		}
+		log.Printf("[update-labels] updated labels for item=%s", d.LibraryItemID)
+		return nil
+	})
 }

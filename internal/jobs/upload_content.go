@@ -9,6 +9,7 @@ import (
 
 	md "github.com/JohannesKaufmann/html-to-markdown"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/omnivore-app/omnivore/internal/config"
 	"github.com/omnivore-app/omnivore/internal/db"
 	"github.com/omnivore-app/omnivore/internal/redisutil"
@@ -33,11 +34,13 @@ func HandleUploadContent(ctx context.Context, cfg *config.Config, redisDS *redis
 
 	content := d.Content
 	if content == "" {
-		if err := dbPool.QueryRow(ctx, `
-			SELECT COALESCE(readable_content, '')
-			FROM omnivore.library_item
-			WHERE id = $1 AND user_id = $2
-		`, d.LibraryItemID, d.UserID).Scan(&content); err != nil {
+		if err := dbPool.AuthTrx(ctx, d.UserID, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `
+				SELECT COALESCE(readable_content, '')
+				FROM omnivore.library_item
+				WHERE id = $1 AND user_id = $2
+			`, d.LibraryItemID, d.UserID).Scan(&content)
+		}); err != nil {
 			return fmt.Errorf("upload-content: query readable_content: %w", err)
 		}
 	}

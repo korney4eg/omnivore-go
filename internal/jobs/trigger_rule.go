@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/omnivore-app/omnivore/internal/config"
 	"github.com/omnivore-app/omnivore/internal/db"
 	"github.com/omnivore-app/omnivore/internal/redisutil"
@@ -48,59 +49,61 @@ func HandleTriggerRule(ctx context.Context, cfg *config.Config, redisDS *redisut
 	}
 
 	// Query matching enabled rules.
-	rows, err := dbPool.Query(ctx, `
-		SELECT id, name, actions
-		FROM omnivore.rules
-		WHERE user_id = $1 AND enabled = true AND $2 = ANY(event_types)
-	`, d.UserID, d.RuleEventType)
-	if err != nil {
-		return fmt.Errorf("trigger-rule: query rules: %w", err)
-	}
-	defer rows.Close()
-
-	var rules []ruleRow
-	for rows.Next() {
-		var r ruleRow
-		var actionsJSON []byte
-		if err := rows.Scan(&r.ID, &r.Name, &actionsJSON); err != nil {
-			return fmt.Errorf("trigger-rule: scan rule: %w", err)
-		}
-		if err := json.Unmarshal(actionsJSON, &r.Actions); err != nil {
-			log.Printf("[trigger-rule] rule id=%s: invalid actions JSON: %v", r.ID, err)
-			continue
-		}
-		rules = append(rules, r)
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("trigger-rule: rows: %w", err)
-	}
-
-	for _, rule := range rules {
-		// Verify item still exists.
-		var itemID string
-		err := dbPool.QueryRow(ctx, `
-			SELECT id FROM omnivore.library_item WHERE id = $1 AND user_id = $2
-		`, libraryItemID, d.UserID).Scan(&itemID)
+	return dbPool.AuthTrx(ctx, d.UserID, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			SELECT id, name, actions
+			FROM omnivore.rules
+			WHERE user_id = $1 AND enabled = true AND $2 = ANY(event_types)
+		`, d.UserID, d.RuleEventType)
 		if err != nil {
-			log.Printf("[trigger-rule] rule=%s item=%s not found, skipping", rule.ID, libraryItemID)
-			continue
+			return fmt.Errorf("query rules: %w", err)
+		}
+		defer rows.Close()
+
+		var rules []ruleRow
+		for rows.Next() {
+			var r ruleRow
+			var actionsJSON []byte
+			if err := rows.Scan(&r.ID, &r.Name, &actionsJSON); err != nil {
+				return fmt.Errorf("scan rule: %w", err)
+			}
+			if err := json.Unmarshal(actionsJSON, &r.Actions); err != nil {
+				log.Printf("[trigger-rule] rule id=%s: invalid actions JSON: %v", r.ID, err)
+				continue
+			}
+			rules = append(rules, r)
+		}
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("rows: %w", err)
 		}
 
-		for _, action := range rule.Actions {
-			if err := applyRuleAction(ctx, dbPool, action, libraryItemID, d.UserID); err != nil {
-				log.Printf("[trigger-rule] rule=%s action=%s failed: %v", rule.ID, action.Type, err)
+		for _, rule := range rules {
+			// Verify item still exists.
+			var itemID string
+			err := tx.QueryRow(ctx, `
+				SELECT id FROM omnivore.library_item WHERE id = $1 AND user_id = $2
+			`, libraryItemID, d.UserID).Scan(&itemID)
+			if err != nil {
+				log.Printf("[trigger-rule] rule=%s item=%s not found, skipping", rule.ID, libraryItemID)
+				continue
 			}
+
+			for _, action := range rule.Actions {
+				if err := applyRuleAction(ctx, tx, action, libraryItemID, d.UserID); err != nil {
+					log.Printf("[trigger-rule] rule=%s action=%s failed: %v", rule.ID, action.Type, err)
+				}
+			}
+			log.Printf("[trigger-rule] applied rule=%s (%s) to item=%s", rule.ID, rule.Name, libraryItemID)
 		}
-		log.Printf("[trigger-rule] applied rule=%s (%s) to item=%s", rule.ID, rule.Name, libraryItemID)
-	}
-	return nil
+		return nil
+	})
 }
 
-func applyRuleAction(ctx context.Context, dbPool *db.Pool, action ruleAction, libraryItemID, userID string) error {
+func applyRuleAction(ctx context.Context, tx pgx.Tx, action ruleAction, libraryItemID, userID string) error {
 	switch action.Type {
 	case "ADD_LABEL":
 		for _, labelID := range action.Params {
-			if _, err := dbPool.Exec(ctx, `
+			if _, err := tx.Exec(ctx, `
 				INSERT INTO omnivore.entity_labels (library_item_id, label_id)
 				VALUES ($1, $2) ON CONFLICT DO NOTHING
 			`, libraryItemID, labelID); err != nil {
@@ -108,7 +111,7 @@ func applyRuleAction(ctx context.Context, dbPool *db.Pool, action ruleAction, li
 			}
 		}
 	case "ARCHIVE":
-		if _, err := dbPool.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 			UPDATE omnivore.library_item
 			SET state = 'ARCHIVED', archived_at = now(), updated_at = now()
 			WHERE id = $1 AND user_id = $2
@@ -116,7 +119,7 @@ func applyRuleAction(ctx context.Context, dbPool *db.Pool, action ruleAction, li
 			return fmt.Errorf("archive: %w", err)
 		}
 	case "DELETE":
-		if _, err := dbPool.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 			UPDATE omnivore.library_item
 			SET state = 'DELETED', deleted_at = now(), updated_at = now()
 			WHERE id = $1 AND user_id = $2
@@ -124,7 +127,7 @@ func applyRuleAction(ctx context.Context, dbPool *db.Pool, action ruleAction, li
 			return fmt.Errorf("delete: %w", err)
 		}
 	case "MARK_AS_READ":
-		if _, err := dbPool.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 			UPDATE omnivore.library_item
 			SET reading_progress_bottom_percent = 100,
 			    reading_progress_top_percent = 100,
