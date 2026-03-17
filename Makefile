@@ -39,12 +39,14 @@ deploy_down:
 DEV_DIR ?= dev
 
 # Bring up the dev stack (builds content-fetcher from local Dockerfile).
+# Uses project name "omnivore-dev" so container names don't conflict with the
+# deploy stack (which runs on port 80; dev runs on port 81).
 dev_up:
-	docker compose -f $(DEV_DIR)/docker-compose.yml --env-file $(DEV_DIR)/.env up -d --build
+	docker compose -p omnivore-dev -f $(DEV_DIR)/docker-compose.yml --env-file $(DEV_DIR)/.env up -d --build
 
 # Tear down the dev stack and wipe all volumes (clean state).
 dev_down:
-	docker compose -f $(DEV_DIR)/docker-compose.yml --env-file $(DEV_DIR)/.env down -v --remove-orphans
+	docker compose -p omnivore-dev -f $(DEV_DIR)/docker-compose.yml --env-file $(DEV_DIR)/.env down -v --remove-orphans
 
 # ── Testsite ────────────────────────────────────────────────────────────────
 
@@ -72,9 +74,15 @@ test_integration:
 
 # Reset the deploy stack (wipes DB + volumes) then run integration tests.
 # Use this for a guaranteed clean run; test_integration works on dirty DB too.
-# To test against dev stack: make test_integration_clean DEPLOY_DIR=dev OMNIVORE_URL=http://omnivore-dev
+# To test against dev stack: make test_integration_clean_dev
 test_integration_clean: deploy_down deploy_up
 	@echo "Waiting 30s for stack to initialise..."
 	@sleep 30
 	OMNIVORE_URL=$(OMNIVORE_URL) HUGO_DIR=$(HUGO_DIR) go test ./tests/integration/... -v -timeout 5m
+
+# Reset the dev stack then run integration tests against omnivore-dev:81.
+test_integration_clean_dev: dev_down dev_up
+	@echo "Waiting 30s for stack to initialise..."
+	@sleep 30
+	OMNIVORE_URL=http://omnivore-dev:81 HUGO_DIR=$(HUGO_DIR) go test ./tests/integration/... -v -timeout 5m
 

@@ -26,7 +26,8 @@ Convenience targets are defined in the `Makefile`:
 | `make dev_up` | Build content-fetcher from local Dockerfile and bring up dev stack |
 | `make dev_down` | Tear down the dev stack and wipe all volumes |
 | `make test_integration` | Run integration tests (deploy stack must be running) |
-| `make test_integration_clean` | Reset stack + run integration tests (guaranteed clean DB) |
+| `make test_integration_clean` | Reset deploy stack + run integration tests |
+| `make test_integration_clean_dev` | Reset dev stack + run integration tests against omnivore-dev:81 |
 | `make testsite_start` | Build Hugo static site and start testsite nginx manually |
 | `make testsite_stop` | Stop the testsite nginx container |
 
@@ -53,10 +54,15 @@ All configuration is provided via environment variables. Copy `.env` from the re
 
 There are two stacks:
 
-| Stack | Folder | Hostname | content-fetcher |
-|---|---|---|---|
-| `deploy` | `deploy/` | `omnivore-deploy` | published image `korney4eg/omnivore-content-fetcher` |
-| `dev` | `dev/` | `omnivore-dev` | built from local `docker/content-fetcher.Dockerfile` |
+| Stack | Folder | Hostname | Port | content-fetcher |
+|---|---|---|---|---|
+| `deploy` | `deploy/` | `omnivore-deploy` | 80 | published image `korney4eg/omnivore-content-fetcher` |
+| `dev` | `dev/` | `omnivore-dev` | 81 | built from local `docker/content-fetcher.Dockerfile` |
+
+Both stacks can run **simultaneously** without conflict:
+- Dev uses port 81 (deploy uses 80)
+- Dev compose runs under project name `omnivore-dev` so all container names are prefixed (`omnivore-dev-nginx-1`, etc.) — no `container_name:` overrides in `dev/`
+- Each stack has its own PostgreSQL, Redis, and MinIO volumes
 
 ```bash
 make deploy_up    # bring up deploy stack
