@@ -23,6 +23,8 @@ services:
         condition: service_healthy
       omnivore-web:
         condition: service_started
+    networks:
+      - default
 
   postgres:
     <<: *postgres-common
@@ -54,18 +56,26 @@ services:
       retries: 6
     env_file:
       - .env
+    extra_hosts:
+      - "omnivore-testsite:host-gateway"
     depends_on:
       migrate:
         condition: service_completed_successfully
+    networks:
+      - default
 
   queue-processor:
     image: "ghcr.io/omnivore-app/sh-queue-processor:latest"
     container_name: "omnivore-queue-processor"
     env_file:
       - .env
+    extra_hosts:
+      - "omnivore-testsite:host-gateway"
     depends_on:
       omnivore-api:
         condition: service_started
+    networks:
+      - default
 
   omnivore-web:
     image: "ghcr.io/omnivore-app/sh-web:latest"
@@ -89,6 +99,8 @@ services:
       - USE_FIREFOX=true
     env_file:
       - .env
+    extra_hosts:
+      - "omnivore-testsite:host-gateway"
     depends_on:
       redis:
         condition: service_healthy
@@ -146,3 +158,6 @@ volumes:
   redis_data:
   minio_data:
   pgdata:
+
+networks:
+  default:

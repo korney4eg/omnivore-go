@@ -1,17 +1,30 @@
 package integration_test
 
 import (
-	"strings"
+	"fmt"
 	"testing"
 	"time"
 )
 
 const (
-	articleURL  = "https://p.umputun.com/en/2026/02/12/ai-agents-2026/"
-	rssFeedURL  = "https://p.umputun.com/index.xml"
-	testLabel   = "TestLabel"
-	importLabel = "RSS"
+	testLabel = "TestLabel"
 )
+
+// testArticleURL returns the URL of the fresh per-run test article.
+// The slug is injected into the Hugo build with today's date so the URL is
+// reachable at http://omnivore-testsite:8765/<year>/<month>/<day>/<slug>/
+func testArticleURL() string {
+	now := time.Now().UTC()
+	return fmt.Sprintf("%s/%04d/%02d/%02d/%s/",
+		testsiteURL, now.Year(), int(now.Month()), now.Day(), articleTestSlug)
+}
+
+// testRSSFeedURL returns the RSS feed URL of the local Hugo testsite.
+func testRSSFeedURL() string { return testsiteURL + "/feed.xml" }
+
+// articleURLFragment matches the per-run article URL in search results.
+// Uses the stable prefix shared by all runs.
+const articleURLFragment = "omnivore-article-test"
 
 // TestScenario runs a full end-to-end integration test against the Omnivore
 // deploy stack. It exercises all major user actions:
@@ -96,7 +109,7 @@ func testAddArticle(t *testing.T, c *omnivoreClient) {
 	}
 	c.gql(t, mutation, map[string]interface{}{
 		"input": map[string]interface{}{
-			"url":             articleURL,
+			"url":             testArticleURL(),
 			"clientRequestId": uuidV4(),
 			"source":          "add-link",
 		},
@@ -113,7 +126,7 @@ func testVerifyArticleImported(t *testing.T, c *omnivoreClient) {
 	var article *searchNode
 	pollUntil(t, 90*time.Second, 3*time.Second, "article state=SUCCEEDED", func() bool {
 		nodes := c.search(t, "", true)
-		n := findByURL(nodes, "ai-agents-2026")
+		n := findByURL(nodes, articleURLFragment)
 		if n == nil {
 			t.Log("article not yet in library, waiting...")
 			return false
@@ -129,9 +142,6 @@ func testVerifyArticleImported(t *testing.T, c *omnivoreClient) {
 	if article.Content == "" {
 		t.Error("article content is empty — HTML body was not stored")
 	}
-	if !strings.Contains(article.Content, "AI") && !strings.Contains(article.Title, "AI") {
-		t.Errorf("article content does not mention 'AI' — got title: %q", article.Title)
-	}
 	t.Logf("✓ article imported: title=%q words=%d content_len=%d",
 		article.Title, article.WordsCount, len(article.Content))
 }
@@ -139,7 +149,7 @@ func testVerifyArticleImported(t *testing.T, c *omnivoreClient) {
 func testAddLabel(t *testing.T, c *omnivoreClient) {
 	t.Helper()
 	nodes := c.search(t, "", false)
-	article := mustFindByURL(t, nodes, "ai-agents-2026")
+	article := mustFindByURL(t, nodes, articleURLFragment)
 
 	mutation := `
 	  mutation SetLabels($input: SetLabelsInput!) {
@@ -173,7 +183,7 @@ func testAddLabel(t *testing.T, c *omnivoreClient) {
 func testVerifyLabelAdded(t *testing.T, c *omnivoreClient) {
 	t.Helper()
 	nodes := c.search(t, "", false)
-	article := mustFindByURL(t, nodes, "ai-agents-2026")
+	article := mustFindByURL(t, nodes, articleURLFragment)
 
 	for _, l := range article.Labels {
 		if l.Name == testLabel {
@@ -187,7 +197,7 @@ func testVerifyLabelAdded(t *testing.T, c *omnivoreClient) {
 func testRemoveLabel(t *testing.T, c *omnivoreClient) {
 	t.Helper()
 	nodes := c.search(t, "", false)
-	article := mustFindByURL(t, nodes, "ai-agents-2026")
+	article := mustFindByURL(t, nodes, articleURLFragment)
 
 	mutation := `
 	  mutation SetLabels($input: SetLabelsInput!) {
@@ -219,7 +229,7 @@ func testRemoveLabel(t *testing.T, c *omnivoreClient) {
 func testVerifyLabelRemoved(t *testing.T, c *omnivoreClient) {
 	t.Helper()
 	nodes := c.search(t, "", false)
-	article := mustFindByURL(t, nodes, "ai-agents-2026")
+	article := mustFindByURL(t, nodes, articleURLFragment)
 
 	for _, l := range article.Labels {
 		if l.Name == testLabel {
@@ -230,11 +240,9 @@ func testVerifyLabelRemoved(t *testing.T, c *omnivoreClient) {
 	t.Logf("✓ label %q removed from article", testLabel)
 }
 
-func testDeleteArticle(t *testing.T, c *omnivoreClient) {
+// deleteArticle removes a library item by ID using SetBookmarkArticle(bookmark:false).
+func deleteArticle(t *testing.T, c *omnivoreClient, articleID string) {
 	t.Helper()
-	nodes := c.search(t, "", false)
-	article := mustFindByURL(t, nodes, "ai-agents-2026")
-
 	mutation := `
 	  mutation SetBookmarkArticle($input: SetBookmarkArticleInput!) {
 	    setBookmarkArticle(input: $input) {
@@ -251,14 +259,20 @@ func testDeleteArticle(t *testing.T, c *omnivoreClient) {
 	}
 	c.gql(t, mutation, map[string]interface{}{
 		"input": map[string]interface{}{
-			"articleID": article.ID,
+			"articleID": articleID,
 			"bookmark":  false,
 		},
 	}, &resp)
-
 	if len(resp.SetBookmarkArticle.ErrorCodes) > 0 {
 		t.Fatalf("setBookmarkArticle error: %v", resp.SetBookmarkArticle.ErrorCodes)
 	}
+}
+
+func testDeleteArticle(t *testing.T, c *omnivoreClient) {
+	t.Helper()
+	nodes := c.search(t, "", false)
+	article := mustFindByURL(t, nodes, articleURLFragment)
+	deleteArticle(t, c, article.ID)
 	t.Logf("article deleted: id=%s", article.ID)
 }
 
@@ -268,7 +282,7 @@ func testVerifyArticleDeleted(t *testing.T, c *omnivoreClient) {
 	time.Sleep(1 * time.Second)
 
 	nodes := c.search(t, "", false)
-	if n := findByURL(nodes, "ai-agents-2026"); n != nil {
+	if n := findByURL(nodes, articleURLFragment); n != nil {
 		t.Errorf("article still present in library after deletion: id=%s state=%s", n.ID, n.State)
 		return
 	}
@@ -293,7 +307,7 @@ func testAddRSSFeed(t *testing.T, c *omnivoreClient) {
 	}
 	c.gql(t, mutation, map[string]interface{}{
 		"input": map[string]interface{}{
-			"url":              rssFeedURL,
+			"url":              testRSSFeedURL(),
 			"subscriptionType": "RSS",
 		},
 	}, &resp)
@@ -317,7 +331,7 @@ func testVerifyRSSPostsImported(t *testing.T, c *omnivoreClient) {
 		nodes := c.search(t, "in:following", false)
 		succeeded := 0
 		for _, n := range nodes {
-			if n.State == "SUCCEEDED" && n.Subscription == rssFeedURL {
+			if n.State == "SUCCEEDED" && n.Subscription == testRSSFeedURL() {
 				succeeded++
 			}
 		}
@@ -328,7 +342,7 @@ func testVerifyRSSPostsImported(t *testing.T, c *omnivoreClient) {
 	// Verify the imported posts have content
 	nodes := c.search(t, "in:following", true)
 	for _, n := range nodes {
-		if n.State == "SUCCEEDED" && n.Subscription == rssFeedURL {
+		if n.State == "SUCCEEDED" && n.Subscription == testRSSFeedURL() {
 			if n.WordsCount == 0 {
 				t.Errorf("RSS post %q has zero word count", n.Title)
 			}

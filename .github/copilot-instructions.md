@@ -21,6 +21,21 @@ Convenience targets are defined in the `Makefile`:
 | `make content_fetch_go_build` | Compile to `bin/omnivore` |
 | `make docker_build_content_fetcher` | Build the Docker image (see below) |
 | `make docker_push_content_fetcher` | Build and push (`REGISTRY` and `IMAGE_TAG` are overridable) |
+| `make deploy_up` | Bring up the reference deploy stack |
+| `make deploy_down` | Tear down the stack and wipe all volumes |
+| `make test_integration` | Run integration tests (deploy stack must be running) |
+| `make test_integration_clean` | Reset stack + run integration tests (guaranteed clean DB) |
+| `make testsite_start` | Build Hugo static site and start testsite nginx manually |
+| `make testsite_stop` | Stop the testsite nginx container |
+
+Configurable variables (override on command line):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `OMNIVORE_URL` | `http://omnivore-deploy` | Target host for integration tests |
+| `DEPLOY_DIR` | `deploy` | Path to the deploy stack folder |
+| `HUGO_DIR` | `/Users/aliaksei.karneyeu/projects/makvaz.com` | Hugo source for testsite |
+| `TESTSITE_DIR` | `testsite` | Testsite folder |
 
 Raw Go toolchain equivalents:
 
@@ -34,24 +49,50 @@ All configuration is provided via environment variables. Copy `.env` from the re
 
 ## Running the deploy stack
 
-"Bring up the deploy version" means: run `docker compose up -d` from the `deploy/` folder. This starts the full Omnivore stack using the reference images (TS backend, queue processor, web, image proxy, mail watcher, Redis, Postgres, MinIO).
+`make deploy_up` / `make deploy_down` are the convenience wrappers. Directly:
 
 ```bash
-cd deploy
-docker compose up -d
-```
-
-To tear it down cleanly (including volumes):
-
-```bash
-cd deploy
-docker compose down -v
+cd deploy && docker compose up -d       # bring up
+cd deploy && docker compose down -v     # tear down (wipes volumes)
 ```
 
 The `deploy/` folder contains:
 - `docker-compose.yml` — reference stack using pre-built images; `content-fetch` uses the published `korney4eg/omnivore-content-fetcher` image (not the local build)
-- `.env` — environment config for the whole stack
+- `.env` — environment config for the whole stack (gitignored; must be created manually)
 - `setup_db.bash` must exist at the **repository root** — it is mounted into the migrate container at startup to initialise the database schema
+
+Key `.env` values to set manually after copying the template:
+- `MQ_REDIS_URL=redis://redis:6379/0` — required for BullMQ; without it the API logs `no redisURL supplied: mq`
+- `SERVER_BASE_URL=http://omnivore-api:8080` — internal Docker URL (NOT the public hostname)
+
+All services in `deploy/docker-compose.yml` that need to reach the test site (omnivore-api, queue-processor, content-fetch) have `extra_hosts: ["omnivore-testsite:host-gateway"]` so they can resolve the hostname to the Docker host.
+
+## Integration tests
+
+Integration tests live in `tests/integration/` and exercise the full stack via GraphQL:
+
+```bash
+make test_integration                           # run against running stack
+make test_integration_clean                     # reset stack then run
+make test_integration OMNIVORE_URL=http://omnivore-dev  # different host
+```
+
+**TestMain** (`hugo_test.go`) runs before all tests:
+1. Copies `HUGO_DIR` to a temp directory
+2. Writes a single-language EN `config.toml` with `baseURL = http://omnivore-testsite:8765`
+3. Injects two fresh test articles with today's date:
+   - `omnivore-article-test-<HHMMSS>` — unique per run so `saveUrl` never deduplicates against a stale soft-deleted item from a prior run
+   - `omnivore-rss-test` — stable daily slug so the RSS queue-processor imports it (items older than 24h are skipped on first subscription)
+4. Builds Hugo static output into `testsite/public/`
+5. Starts the testsite nginx container (`testsite/docker-compose.yml`) on `0.0.0.0:8765`
+6. Health-checks `http://localhost:8765/feed.xml` before proceeding
+
+The testsite is torn down after tests complete. `testsite/public/` is gitignored.
+
+**Key design decisions:**
+- Article URLs are unique per run (timestamp in slug) — Omnivore soft-deletes items and `saveUrl` would re-activate a stuck PROCESSING item if the URL was reused
+- RSS test article always has today's date — the queue-processor skips items older than 24h on first subscription
+- Containers reach the testsite via `extra_hosts: omnivore-testsite:host-gateway`; the host test process uses `http://localhost:8765`
 
 ## High-level architecture
 
