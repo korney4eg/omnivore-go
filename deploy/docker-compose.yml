@@ -73,9 +73,7 @@ services:
       - .env
 
   content-fetch:
-    build:
-      context: .
-      dockerfile: docker/content-fetcher.Dockerfile
+    image: "ghcr.io/omnivore-app/sh-content-fetch-go:latest"
     container_name: "omnivore-content-fetch"
     ports:
       - "9090:8080"
