@@ -2,6 +2,7 @@
 REGISTRY     ?= korney4eg
 IMAGE_TAG    ?= latest
 OMNIVORE_URL ?= http://omnivore-deploy
+DEPLOY_DIR   ?= deploy
 
 # ── Go content-fetcher ──────────────────────────────────────────────────────
 
@@ -29,8 +30,8 @@ test_integration:
 
 # Reset the deploy stack (wipes DB + volumes) then run integration tests.
 test_integration_clean:
-	docker compose -f deploy/docker-compose.yml --env-file deploy/.env down -v --remove-orphans
-	docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
+	docker compose -f $(DEPLOY_DIR)/docker-compose.yml --env-file $(DEPLOY_DIR)/.env down -v --remove-orphans
+	docker compose -f $(DEPLOY_DIR)/docker-compose.yml --env-file $(DEPLOY_DIR)/.env up -d
 	@echo "Waiting for stack to be ready..."
 	@sleep 30
 	OMNIVORE_URL=$(OMNIVORE_URL) go test ./tests/integration/... -v -timeout 5m
