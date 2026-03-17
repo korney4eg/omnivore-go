@@ -1,3 +1,4 @@
 .env
 testsite/public/*
 !testsite/public/.gitkeep
+bin/

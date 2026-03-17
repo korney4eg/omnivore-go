@@ -103,7 +103,11 @@ func (w *Worker) processJob(job *bullmq.RawJob) {
 	switch job.Name {
 	case "save-page":
 		err = jobs.HandleSavePage(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
-	case "refresh-feed", "refresh-all-feeds", "trigger-rule", "find-thumbnail",
+	case "refresh-feed":
+		err = jobs.HandleRefreshFeed(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "refresh-all-feeds":
+		err = jobs.HandleRefreshAllFeeds(w.ctx, w.cfg, w.redisDS, w.db, job.Data)
+	case "trigger-rule", "find-thumbnail",
 		"call-webhook", "prune-trash", "expire-folders", "upload-content",
 		"sync-read-positions", "update-labels", "update-highlight", "bulk-action",
 		"ai-summarize", "send-email", "export", "update-home", "create-digest":

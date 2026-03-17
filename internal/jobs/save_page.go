@@ -40,6 +40,7 @@ type SavePageData struct {
 	SavedAt                *string  `json:"savedAt,omitempty"`
 	PublishedAt            *string  `json:"publishedAt,omitempty"`
 	Title                  string   `json:"title,omitempty"`
+	Author                 string   `json:"author,omitempty"`
 	ContentType            string   `json:"contentType,omitempty"`
 	CacheKey               string   `json:"cacheKey,omitempty"`
 	TaskID                 *string  `json:"taskId,omitempty"`

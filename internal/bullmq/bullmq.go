@@ -89,18 +89,38 @@ func nextJobID(ctx context.Context, redisClient *redis.Client, queueName string)
 
 // AddJobOpts carries parameters for adding a single job.
 type AddJobOpts struct {
-	Name     string
-	Data     interface{}
-	Opts     JobOpts
+	Name  string
+	Data  interface{}
+	Opts  JobOpts
+	// JobID is an optional deterministic ID. If set, the job is deduplicated:
+	// a new job is only added when no job with this key already exists in Redis.
+	JobID string
 }
 
 // AddBulk adds multiple jobs to a BullMQ queue, replicating addBulk() semantics.
 // Each job is stored as a hash and its ID appended to the appropriate list/zset.
 func AddBulk(ctx context.Context, redisClient *redis.Client, queueName string, jobs []AddJobOpts) error {
 	for _, j := range jobs {
-		jobID, err := nextJobID(ctx, redisClient, queueName)
-		if err != nil {
-			return fmt.Errorf("get next job id: %w", err)
+		var jobID string
+		var err error
+
+		if j.JobID != "" {
+			// Custom deterministic job ID — deduplicate by checking key existence.
+			key := jobKey(queueName, j.JobID)
+			exists, exErr := redisClient.Exists(ctx, key).Result()
+			if exErr != nil {
+				return fmt.Errorf("check job exists %s: %w", j.JobID, exErr)
+			}
+			if exists > 0 {
+				log.Printf("Skipping duplicate job %s/%s id=%s", queueName, j.Name, j.JobID)
+				continue
+			}
+			jobID = j.JobID
+		} else {
+			jobID, err = nextJobID(ctx, redisClient, queueName)
+			if err != nil {
+				return fmt.Errorf("get next job id: %w", err)
+			}
 		}
 
 		dataBytes, err := json.Marshal(j.Data)
@@ -153,6 +173,7 @@ func AddBulk(ctx context.Context, redisClient *redis.Client, queueName string, j
 				"data":  string(eventPayload),
 			},
 			MaxLen: 10000,
+			Approx: true,
 		})
 
 		if _, err := pipe.Exec(ctx); err != nil {
