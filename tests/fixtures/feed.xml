@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Makvaz</title>
+    <link>http://omnivore-testsite:8765/</link>
+    <description>Technical notes and other</description>
+    <language>en-us</language>
+    <atom:link href="http://omnivore-testsite:8765/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Book &#34;Learning eBPF&#34;</title>
+      <link>http://omnivore-testsite:8765/2026/01/20/book-learning-ebpf/</link>
+      <pubDate>Mon, 20 Jan 2026 00:00:00 +0000</pubDate>
+      <guid>http://omnivore-testsite:8765/2026/01/20/book-learning-ebpf/</guid>
+      <description>I always knew that eBPF was one of those technologies hidden deep inside the kernel.</description>
+    </item>
+    <item>
+      <title>PostgreSQL. Fixing &#34;type does not exist&#34; error during restoring database.</title>
+      <link>http://omnivore-testsite:8765/2024/06/20/postgresql-unknown-type-during-database-restore/</link>
+      <pubDate>Thu, 20 Jun 2024 00:00:00 +0000</pubDate>
+      <guid>http://omnivore-testsite:8765/2024/06/20/postgresql-unknown-type-during-database-restore/</guid>
+      <description>How to fix unknown type errors when restoring a PostgreSQL database.</description>
+    </item>
+  </channel>
+</rss>

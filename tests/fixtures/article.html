@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta property="og:title" content="Book &#34;Learning eBPF&#34;" />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="http://omnivore-testsite:8765/2026/01/20/book-learning-ebpf/" />
+    <meta property="og:image" content="http://omnivore-testsite:8765/" />
+    <title>Book &#34;Learning eBPF&#34;</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="shortcut icon" href="/assets/favicon.png" type="image/x-icon">
+    
+    
+    
+    <link rel="stylesheet" href=http://omnivore-testsite:8765/css/bulma_min.css>
+    <link rel="stylesheet" href=http://omnivore-testsite:8765/css/open_sans.css>
+    <link rel="stylesheet" href=http://omnivore-testsite:8765/css/font-awesome.min.css>
+    <link rel="stylesheet" href="http://omnivore-testsite:8765/css/blog.css" />
+    <link rel="stylesheet" href=http://omnivore-testsite:8765/css/cookieconsent.min.css>
+<script src="http://omnivore-testsite:8765/js/cookieconsent.min.js"></script>
+<script>
+window.addEventListener("load", function(){
+window.cookieconsent.initialise({
+  "palette": {
+    "popup": {
+      "background": "#000"
+    },
+    "button": {
+      "background": "#f1d600"
+    }
+  },
+  "theme": "classic",
+  "position": "bottom-left",
+  "content": {
+    "message": "This website uses cookies to ensure you get the best experience on our website.",
+    "dismiss": "Got it!",
+    "link": "Learn more"
+  }
+})});
+</script>
+
+  
+    
+  
+
+  
+</head>
+<body>
+
+    <nav class="navbar is-fixed-top" role="navigation" aria-label="main navigation">
+      <div class="navbar-brand">
+          <a class="navbar-item" href="/" style="font-weight:bold;">
+            Makvaz
+          </a>
+        <a role="button" class="navbar-burger burger"  data-target="navbarBasicExample">
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </a>
+      </div>
+        <div id="navbarBasicExample" class="navbar-menu">
+          <div class="navbar-end">
+    
+    
+          </div>
+        </div>
+
+    </nav>
+    <script type="text/javascript">
+      (function() {
+        var burger = document.querySelector('.burger');
+        var nav = document.querySelector('#'+burger.dataset.target);
+        burger.addEventListener('click', function(){
+          burger.classList.toggle('is-active');
+          nav.classList.toggle('is-active');
+        });
+      })();
+    </script>
+    
+
+    
+    <section class="hero is-info is-medium">
+      <div class="hero-body" style="background-image: url(http://omnivore-testsite:8765/);background-position: top;">
+            <div class="container has-text-centered">
+                <br>
+                <h1 class="title is-size-1">
+                    
+                        Book &#34;Learning eBPF&#34;
+                    
+                </h1>
+            </div>
+
+<p class="subtitle is-size-6 has-text-grey-light" align="center">
+    20.01.2026
+</p>
+
+        </div>
+    </section>
+
+
+<div class="container">
+    <div class="section">
+    
+<div class="tags">
+
+    <span class="tag"><a href="http://omnivore-testsite:8765/tags/books">books</a></span>
+
+    <span class="tag"><a href="http://omnivore-testsite:8765/tags/ebpf">ebpf</a></span>
+
+</div>
+<div class="columns">
+    <div class="column is-9">
+        <div class="tile is-child box">
+            <div class="content">
+              
+                <p><img src="/2026/01/20/book-learning-ebpf/book-cover.png" alt="" width="220"
+style="float: left; margin-right: 15px"></p>
+<p><em>I always knew that eBPF was one of those technologies hidden deep inside the
+kernel, far away from everyday users, but incredibly powerful.</em></p>
+<p><em>At work, I learned that Google Kubernetes Engine clusters using Dataplane V2
+rely heavily on eBPF under the hood. That felt like a good opportunity to
+finally dive into something new, so I grabbed the book <strong>Learning eBPF</strong> from the
+office bookshelf.</em></p>
+<p><em>This post is my review of that book.</em></p>
+<p>At the beginning, <a href="http://www.lizrice.com">Liz Rice</a> covers the history of eBPF
+as a technology and explains its core working principles. What impressed me the
+most is that eBPF allows you to load programs into the Linux kernel without
+recompiling the kernel itself and without rebooting the operating system.
+Thanks to the built-in <code>verifier</code>, it is much harder to load a program that
+could harm the system.</p>
+<p>After the introduction, the book moves quickly to practice. We write our first
+“Hello, world”–style program in Python, which loads and runs eBPF code in the
+kernel. The next step is writing eBPF programs in C, compiling them, and
+attaching them to the kernel manually.</p>
+<p>Step by step, the book dives deeper into different aspects of eBPF and how it
+works in practice. Closer to the end, the author shows how eBPF is used in
+Kubernetes networking and how modern security tools rely on this technology.</p>
+<p>This is one of my favorite types of technical books: focused, with no unnecessary
+fluff, but full of concrete examples and hands-on practice. The book is written
+in clear and accessible language, although I can’t remember the last time I felt
+so intellectually exhausted while learning something new.</p>
+<p>If you are a power user of Linux systems, comfortable with installing and
+compiling software, but have always been a bit afraid to explore what is
+happening at the kernel level, I can definitely recommend this book. Moreover,
+it is <a href="https://cilium.isovalent.com/hubfs/Learning-eBPF%20-%20Full%20book.pdf">available for free</a>.</p>
+            </div>
+        </div>
+      
+    </div>
+    <div class="column is-3">
+        <div class="card">
+    <div class="card-content">
+        <h1 class="title is-5">Labels</h1>
+        <div class="tags">
+        
+            <span class="tag"><a href="http://omnivore-testsite:8765/tags/aws">aws</a></span>
+        
+            <span class="tag"><a href="http://omnivore-testsite:8765/tags/books">books</a></span>
+        
+            <span class="tag"><a href="http://omnivore-testsite:8765/tags/certification">certification</a></span>
+        
+            <span class="tag"><a href="http://omnivore-testsite:8765/tags/ebpf">ebpf</a></span>
+        
+            <span class="tag"><a href="http://omnivore-testsite:8765/tags/gcp">gcp</a></span>
+        
+            <span class="tag"><a href="http://omnivore-testsite:8765/tags/howto">howto</a></span>
+        
+            <span class="tag"><a href="http://omnivore-testsite:8765/tags/kubernetes">kubernetes</a></span>
+        
+            <span class="tag"><a href="http://omnivore-testsite:8765/tags/test">test</a></span>
+        
+            <span class="tag"><a href="http://omnivore-testsite:8765/tags/tips">tips</a></span>
+        
+            <span class="tag"><a href="http://omnivore-testsite:8765/tags/vagrant">vagrant</a></span>
+        
+            <span class="tag"><a href="http://omnivore-testsite:8765/tags/vim">vim</a></span>
+        
+        </div>
+    </div>
+</div>
+<br>
+                
+
+
+<br>
+        <div class="card">
+    <div class="card-content">
+      <h1 class="title is-5">Recent posts</h1>
+        
+            <h1><a href="http://omnivore-testsite:8765/2019/07/15/aws-certification-preparation/">How I prepared to &#34;AWS Certified SysOps Administrator – Associate&#34; exam.</a></h1>
+            <time class="has-text-grey-light is-size-7">15.07.2019</time>
+        
+            <h1><a href="http://omnivore-testsite:8765/2020/05/27/vim-switch-between-files/">How to easily switch between files in Vim</a></h1>
+            <time class="has-text-grey-light is-size-7">27.05.2020</time>
+        
+            <h1><a href="http://omnivore-testsite:8765/2020/07/29/kubernetes-the-hard-way-on-laptop-preparation/">Kubernetes The Hard Way on your laptop. Preparation</a></h1>
+            <time class="has-text-grey-light is-size-7">29.07.2020</time>
+        
+            <h1><a href="http://omnivore-testsite:8765/2020/08/10/kubernetes-the-hard-way-on-laptop-setup-vms/">Kubernetes The Hard Way on your laptop. Setup Virtual Machines.</a></h1>
+            <time class="has-text-grey-light is-size-7">10.08.2020</time>
+        
+            <h1><a href="http://omnivore-testsite:8765/2022/10/30/thought-after-passing-google-certification/">My thought after passing &#34;Google Cloud Professional Architect&#34; certification</a></h1>
+            <time class="has-text-grey-light is-size-7">30.10.2022</time>
+        
+    </div>
+</div>
+<br>
+        <div class="card">
+    <div class="card-content">
+        <h1 class="title is-5">Archives</h1>
+        
+            <a href="http://omnivore-testsite:8765/archives/2026">2026</a> (3)<br>
+        
+            <a href="http://omnivore-testsite:8765/archives/2024">2024</a> (1)<br>
+        
+            <a href="http://omnivore-testsite:8765/archives/2022">2022</a> (1)<br>
+        
+            <a href="http://omnivore-testsite:8765/archives/2020">2020</a> (3)<br>
+        
+            <a href="http://omnivore-testsite:8765/archives/2019">2019</a> (1)<br>
+        
+    </div>
+</div>
+
+    </div>
+</div>
+
+
+    </div>
+</div>
+
+<footer class="footer has-background-grey-darker has-text-white">
+    <div class="content has-text-centered">
+        <p>
+            <span class="icon is-large"><a href="https://twitter.com/kornei4" class="mysocial"><i class="fab fa-twitter fa-3x"></i></a></span>&nbsp;&nbsp;
+            <span class="icon is-large"><a href="https://github.com/korney4eg/" class="mysocial"><i class="fab fa-github fa-3x"></i></a></span>&nbsp;&nbsp;
+            <span class="icon is-large"><a href="/feed.xml" class="mysocial"><i class="fas fa-rss-square fa-3x"></i></a></span>&nbsp;&nbsp;
+            <span class="icon is-large"><a href="https://www.t.me/korney4eg" class="mysocial"><i class="fab fa-telegram-plane fa-3x"></i></a></span>&nbsp;&nbsp;
+            <span class="icon is-large"><a href="https://www.linkedin.com/in/aliaksei-karneyeu-6064a745/" class="mysocial"><i class="fab fa-linkedin fa-3x"></i></a></span>&nbsp;&nbsp;
+            <br><br>
+            All rights reserved &copy;Makvaz 2017-2026
+            <br><a href="http://omnivore-testsite:8765//privacy" title="Privacy policy">Privacy policy</a>
+            
+        </p>
+    </div>
+</footer>
+
+<script defer src="http://omnivore-testsite:8765/js/fontawesome.js"></script>
+</body>
+</html>
+
