@@ -61,7 +61,9 @@ services:
       - default
 
   queue-processor:
-    image: "ghcr.io/omnivore-app/sh-queue-processor:latest"
+    build:
+      context: ..
+      dockerfile: docker/queue-processor.Dockerfile
     env_file:
       - .env
     extra_hosts:
