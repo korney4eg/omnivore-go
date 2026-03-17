@@ -88,7 +88,20 @@ func (c *Client) UploadContent(ctx context.Context, filePath, content string) er
 	return nil
 }
 
-// UploadOriginalContent mirrors uploadOriginalContent() from request_handler.ts.
+// DownloadContent downloads a blob at the given path and returns it as a string.
+func (c *Client) DownloadContent(ctx context.Context, path string) (string, error) {
+	r, err := c.bucket.NewReader(ctx, path, nil)
+	if err != nil {
+		return "", fmt.Errorf("open blob reader %s: %w", path, err)
+	}
+	defer r.Close()
+
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return "", fmt.Errorf("read blob %s: %w", path, err)
+	}
+	return string(data), nil
+}
 // It uploads content for each user at:
 //
 //	content/{userId}/{libraryItemId}.{timestampMs}.original

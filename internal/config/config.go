@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -50,6 +51,9 @@ type Config struct {
 
 	// Domain blocking
 	MaxFeedFetchFailures int
+
+	// Database
+	DatabaseURL string
 }
 
 func Load() *Config {
@@ -82,6 +86,8 @@ func Load() *Config {
 		JWTSecret:                   os.Getenv("JWT_SECRET"),
 
 		MaxFeedFetchFailures: envInt("MAX_FEED_FETCH_FAILURES", 10),
+
+		DatabaseURL: buildDatabaseURL(),
 	}
 
 	return cfg
@@ -112,4 +118,19 @@ func envInt(key string, def int) int {
 		}
 	}
 	return def
+}
+
+func buildDatabaseURL() string {
+	if v := os.Getenv("DATABASE_URL"); v != "" {
+		return v
+	}
+	if v := os.Getenv("PG_DSN"); v != "" {
+		return v
+	}
+	host := envDefault("PG_HOST", "localhost")
+	user := envDefault("PG_USER", "app_user")
+	pass := envDefault("PG_PASSWORD", "app_pass")
+	db := envDefault("PG_DB", "omnivore")
+	port := envDefault("PG_PORT", "5432")
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, pass, host, port, db)
 }
