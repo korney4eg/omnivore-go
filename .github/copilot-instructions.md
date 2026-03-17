@@ -32,6 +32,27 @@ Raw Go toolchain equivalents:
 
 All configuration is provided via environment variables. Copy `.env` from the repository root and fill in the required values — it contains every supported variable with defaults. The minimum required at startup are `VERIFICATION_TOKEN` and `REDIS_URL`. The service defaults to port 3002 (override with `PORT`).
 
+## Running the deploy stack
+
+"Bring up the deploy version" means: run `docker compose up -d` from the `deploy/` folder. This starts the full Omnivore stack using the reference images (TS backend, queue processor, web, image proxy, mail watcher, Redis, Postgres, MinIO).
+
+```bash
+cd deploy
+docker compose up -d
+```
+
+To tear it down cleanly (including volumes):
+
+```bash
+cd deploy
+docker compose down -v
+```
+
+The `deploy/` folder contains:
+- `docker-compose.yml` — reference stack using pre-built images; `content-fetch` uses the published `korney4eg/omnivore-content-fetcher` image (not the local build)
+- `.env` — environment config for the whole stack
+- `setup_db.bash` must exist at the **repository root** — it is mounted into the migrate container at startup to initialise the database schema
+
 ## High-level architecture
 
 This repository is a single Go binary (`main.go`) that dispatches through Cobra commands in `cmd/`. Today the only implemented service command is `omnivore server content-fetcher` (`cmd/server/content_fetcher.go`).
