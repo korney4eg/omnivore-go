@@ -29,22 +29,22 @@ type DBQuerier interface {
 
 // SavePageData mirrors SavePageJobData from save_page.ts.
 type SavePageData struct {
-	UserID                 string   `json:"userId"`
-	URL                    string   `json:"url"`
-	FinalURL               string   `json:"finalUrl"`
-	ArticleSavingRequestID string   `json:"articleSavingRequestId"`
-	State                  *string  `json:"state,omitempty"`
-	Labels                 []Label  `json:"labels,omitempty"`
-	Source                 string   `json:"source"`
-	Folder                 *string  `json:"folder,omitempty"`
-	RSSFeedURL             *string  `json:"rssFeedUrl,omitempty"`
-	SavedAt                *string  `json:"savedAt,omitempty"`
-	PublishedAt            *string  `json:"publishedAt,omitempty"`
-	Title                  string   `json:"title,omitempty"`
-	Author                 string   `json:"author,omitempty"`
-	ContentType            string   `json:"contentType,omitempty"`
-	CacheKey               string   `json:"cacheKey,omitempty"`
-	TaskID                 *string  `json:"taskId,omitempty"`
+	UserID                 string  `json:"userId"`
+	URL                    string  `json:"url"`
+	FinalURL               string  `json:"finalUrl"`
+	ArticleSavingRequestID string  `json:"articleSavingRequestId"`
+	State                  *string `json:"state,omitempty"`
+	Labels                 []Label `json:"labels,omitempty"`
+	Source                 string  `json:"source"`
+	Folder                 *string `json:"folder,omitempty"`
+	RSSFeedURL             *string `json:"rssFeedUrl,omitempty"`
+	SavedAt                *string `json:"savedAt,omitempty"`
+	PublishedAt            *string `json:"publishedAt,omitempty"`
+	Title                  string  `json:"title,omitempty"`
+	Author                 string  `json:"author,omitempty"`
+	ContentType            string  `json:"contentType,omitempty"`
+	CacheKey               string  `json:"cacheKey,omitempty"`
+	TaskID                 *string `json:"taskId,omitempty"`
 }
 
 // Label mirrors CreateLabelInput.
@@ -143,7 +143,7 @@ func handleSavePageImpl(
 
 	// 3. Determine state, folder, subscription.
 	state := "SUCCEEDED"
-	if data.State != nil && *data.State != "" {
+	if data.State != nil && *data.State != "" && *data.State != "PROCESSING" {
 		state = *data.State
 	}
 

@@ -10,6 +10,14 @@ cd deploy && docker compose down -v && docker compose up -d
 
 `down -v` removes all volumes (PostgreSQL data, MinIO data, Redis data), ensuring a clean state. The migrate container will recreate the schema and demo user on next startup.
 
+Start the local testsite used by the browser scenario:
+
+```bash
+make testsite_start
+```
+
+This serves the local Hugo content on `http://localhost:8765` for the host browser and on `http://omnivore-testsite:8765` for Docker containers.
+
 ## Steps
 
 ### 1. Open the web UI
@@ -27,7 +35,7 @@ These credentials are created by `setup_db.bash` during the migrate step.
 
 ### 3. Add an article
 
-Add the URL `https://p.umputun.com/en/2026/02/12/ai-agents-2026/` using the **Add** button.
+Add the URL `http://omnivore-testsite:8765/2026/01/20/book-learning-ebpf/` using the **Add** button.
 
 Verify the article appears in the Library.
 
@@ -49,6 +57,6 @@ Delete the article and verify it no longer appears in the Library.
 
 ### 8. Add an RSS feed
 
-Add the RSS feed `https://p.umputun.com/index.xml` via Subscriptions.
+Add the RSS feed `http://omnivore-testsite:8765/feed.xml` via Subscriptions.
 
-Verify that new posts from the feed are imported and appear in the Library.
+Verify that new posts from the feed are imported and appear in the subscription view. You can also confirm they are returned from Library search with the `in:following` filter.

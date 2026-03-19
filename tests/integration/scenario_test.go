@@ -10,6 +10,8 @@ const (
 	testLabel = "TestLabel"
 )
 
+const archiveArticleURL = "http://omnivore-testsite:8765/2026/01/20/book-learning-ebpf/"
+
 // testArticleURL returns the URL of the fresh per-run test article.
 // The slug is injected into the Hugo build with today's date so the URL is
 // reachable at http://omnivore-testsite:8765/<year>/<month>/<day>/<slug>/
@@ -78,6 +80,42 @@ func TestScenario(t *testing.T) {
 		testVerifyArticleDeleted(t, c)
 	})
 
+	t.Run("verify_article_in_trash", func(t *testing.T) {
+		testVerifyArticleInTrash(t, c)
+	})
+
+	t.Run("restore_article_from_trash", func(t *testing.T) {
+		testRestoreArticleFromTrash(t, c)
+	})
+
+	t.Run("verify_article_restored", func(t *testing.T) {
+		testVerifyArticleRestored(t, c)
+	})
+
+	t.Run("add_archive_article", func(t *testing.T) {
+		testAddArchiveArticle(t, c)
+	})
+
+	t.Run("archive_article", func(t *testing.T) {
+		testArchiveArticle(t, c)
+	})
+
+	t.Run("verify_article_in_archive", func(t *testing.T) {
+		testVerifyArticleInArchive(t, c)
+	})
+
+	t.Run("verify_archived_article_openable", func(t *testing.T) {
+		testVerifyArchivedArticleOpenable(t, c)
+	})
+
+	t.Run("unarchive_article", func(t *testing.T) {
+		testUnarchiveArticle(t, c)
+	})
+
+	t.Run("verify_article_unarchived", func(t *testing.T) {
+		testVerifyArticleUnarchived(t, c)
+	})
+
 	t.Run("add_rss_feed", func(t *testing.T) {
 		testAddRSSFeed(t, c)
 	})
@@ -101,10 +139,10 @@ func testAddArticle(t *testing.T, c *omnivoreClient) {
 
 	var resp struct {
 		SaveURL struct {
-			URL              string   `json:"url"`
-			ClientRequestID  string   `json:"clientRequestId"`
-			ErrorCodes       []string `json:"errorCodes"`
-			Message          string   `json:"message"`
+			URL             string   `json:"url"`
+			ClientRequestID string   `json:"clientRequestId"`
+			ErrorCodes      []string `json:"errorCodes"`
+			Message         string   `json:"message"`
 		} `json:"saveUrl"`
 	}
 	c.gql(t, mutation, map[string]interface{}{
@@ -150,6 +188,7 @@ func testAddLabel(t *testing.T, c *omnivoreClient) {
 	t.Helper()
 	nodes := c.search(t, "", false)
 	article := mustFindByURL(t, nodes, articleURLFragment)
+	labelID := ensureLabel(t, c, testLabel, "#ff0000")
 
 	mutation := `
 	  mutation SetLabels($input: SetLabelsInput!) {
@@ -167,10 +206,8 @@ func testAddLabel(t *testing.T, c *omnivoreClient) {
 	}
 	c.gql(t, mutation, map[string]interface{}{
 		"input": map[string]interface{}{
-			"pageId": article.ID,
-			"labels": []map[string]interface{}{
-				{"name": testLabel, "color": "#ff0000"},
-			},
+			"pageId":   article.ID,
+			"labelIds": []string{labelID},
 		},
 	}, &resp)
 
@@ -210,7 +247,7 @@ func testRemoveLabel(t *testing.T, c *omnivoreClient) {
 	var resp struct {
 		SetLabels struct {
 			Labels     []struct{ Name string } `json:"labels"`
-			ErrorCodes []string               `json:"errorCodes"`
+			ErrorCodes []string                `json:"errorCodes"`
 		} `json:"setLabels"`
 	}
 	c.gql(t, mutation, map[string]interface{}{
@@ -287,6 +324,392 @@ func testVerifyArticleDeleted(t *testing.T, c *omnivoreClient) {
 		return
 	}
 	t.Log("✓ article no longer in library")
+}
+
+func testVerifyArticleInTrash(t *testing.T, c *omnivoreClient) {
+	t.Helper()
+	var article *searchNode
+	pollUntil(t, 30*time.Second, 2*time.Second, "deleted article visible in trash", func() bool {
+		nodes := c.search(t, "in:trash", false)
+		article = findByURL(nodes, articleURLFragment)
+		return article != nil
+	})
+	if article.State != "DELETED" {
+		t.Fatalf("deleted article should have state=DELETED in trash, got %s", article.State)
+	}
+	t.Logf("✓ deleted article is visible in trash: id=%s", article.ID)
+}
+
+func restoreArticleFromTrash(t *testing.T, c *omnivoreClient, articleID string) {
+	t.Helper()
+
+	mutation := `
+	  mutation UpdatePage($input: UpdatePageInput!) {
+	    updatePage(input: $input) {
+	      ... on UpdatePageSuccess { updatedPage { id state } }
+	      ... on UpdatePageError   { errorCodes }
+	    }
+	  }`
+
+	var resp struct {
+		UpdatePage struct {
+			UpdatedPage struct {
+				ID    string `json:"id"`
+				State string `json:"state"`
+			} `json:"updatedPage"`
+			ErrorCodes []string `json:"errorCodes"`
+		} `json:"updatePage"`
+	}
+
+	c.gql(t, mutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"pageId": articleID,
+			"state":  "SUCCEEDED",
+		},
+	}, &resp)
+
+	if len(resp.UpdatePage.ErrorCodes) > 0 {
+		t.Fatalf("updatePage restore error: %v", resp.UpdatePage.ErrorCodes)
+	}
+	if resp.UpdatePage.UpdatedPage.State != "SUCCEEDED" {
+		t.Fatalf("restore should set state=SUCCEEDED, got %s", resp.UpdatePage.UpdatedPage.State)
+	}
+}
+
+func testRestoreArticleFromTrash(t *testing.T, c *omnivoreClient) {
+	t.Helper()
+
+	nodes := c.search(t, "in:trash", false)
+	article := mustFindByURL(t, nodes, articleURLFragment)
+	restoreArticleFromTrash(t, c, article.ID)
+	t.Logf("article restored from trash: id=%s", article.ID)
+}
+
+func testVerifyArticleRestored(t *testing.T, c *omnivoreClient) {
+	t.Helper()
+
+	pollUntil(t, 30*time.Second, 2*time.Second, "restored article back in library", func() bool {
+		nodes := c.search(t, "", false)
+		article := findByURL(nodes, articleURLFragment)
+		return article != nil && article.State == "SUCCEEDED"
+	})
+
+	trashNodes := c.search(t, "in:trash", false)
+	if article := findByURL(trashNodes, articleURLFragment); article != nil {
+		t.Fatalf("restored article should not remain in trash: id=%s state=%s", article.ID, article.State)
+	}
+
+	t.Log("✓ deleted article restored back to library")
+}
+
+func testAddArchiveArticle(t *testing.T, c *omnivoreClient) {
+	t.Helper()
+	mutation := `
+	  mutation SaveUrl($input: SaveUrlInput!) {
+	    saveUrl(input: $input) {
+	      ... on SaveSuccess    { url clientRequestId }
+	      ... on SaveError      { errorCodes message }
+	    }
+	  }`
+
+	var resp struct {
+		SaveURL struct {
+			URL             string   `json:"url"`
+			ClientRequestID string   `json:"clientRequestId"`
+			ErrorCodes      []string `json:"errorCodes"`
+			Message         string   `json:"message"`
+		} `json:"saveUrl"`
+	}
+	c.gql(t, mutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"url":             archiveArticleURL,
+			"clientRequestId": uuidV4(),
+			"source":          "add-link",
+		},
+	}, &resp)
+
+	if len(resp.SaveURL.ErrorCodes) > 0 {
+		t.Fatalf("saveUrl (archive article) returned errors: %v — %s", resp.SaveURL.ErrorCodes, resp.SaveURL.Message)
+	}
+	t.Logf("archive candidate queued: clientRequestId=%s", resp.SaveURL.ClientRequestID)
+}
+
+func archiveArticle(t *testing.T, c *omnivoreClient, articleID string) {
+	t.Helper()
+	mutation := `
+	  mutation SetLinkArchived($input: ArchiveLinkInput!) {
+	    setLinkArchived(input: $input) {
+	      ... on ArchiveLinkSuccess { linkId message }
+	      ... on ArchiveLinkError   { message errorCodes }
+	    }
+	  }`
+
+	var resp struct {
+		SetLinkArchived struct {
+			LinkID     string   `json:"linkId"`
+			Message    string   `json:"message"`
+			ErrorCodes []string `json:"errorCodes"`
+		} `json:"setLinkArchived"`
+	}
+	c.gql(t, mutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"linkId":   articleID,
+			"archived": true,
+		},
+	}, &resp)
+	if len(resp.SetLinkArchived.ErrorCodes) > 0 {
+		t.Fatalf("setLinkArchived archive error: %v", resp.SetLinkArchived.ErrorCodes)
+	}
+	if resp.SetLinkArchived.LinkID != articleID {
+		t.Fatalf("setLinkArchived archived wrong article: got %s want %s", resp.SetLinkArchived.LinkID, articleID)
+	}
+}
+
+func testArchiveArticle(t *testing.T, c *omnivoreClient) {
+	t.Helper()
+	var article *searchNode
+	pollUntil(t, 90*time.Second, 3*time.Second, "archive article imported with state=SUCCEEDED", func() bool {
+		nodes := c.search(t, "", false)
+		for i := range nodes {
+			if nodes[i].URL == archiveArticleURL {
+				article = &nodes[i]
+				return nodes[i].State == "SUCCEEDED"
+			}
+		}
+		return false
+	})
+
+	archiveArticle(t, c, article.ID)
+	t.Logf("article archived: id=%s", article.ID)
+}
+
+func testVerifyArticleInArchive(t *testing.T, c *omnivoreClient) {
+	t.Helper()
+	var archived *searchNode
+	pollUntil(t, 30*time.Second, 2*time.Second, "archived article visible in archive", func() bool {
+		nodes := c.search(t, "in:archive", false)
+		for i := range nodes {
+			if nodes[i].URL == archiveArticleURL {
+				archived = &nodes[i]
+				return true
+			}
+		}
+		return false
+	})
+	if archived == nil {
+		t.Fatalf("archived article %q not found in archive results", archiveArticleURL)
+	}
+	if archived.State != "ARCHIVED" {
+		t.Fatalf("archived article should have state=ARCHIVED, got %s", archived.State)
+	}
+	t.Logf("✓ archived article is visible in archive: id=%s", archived.ID)
+}
+
+func queryArticleBySlug(t *testing.T, c *omnivoreClient, slug string) (state, content string) {
+	t.Helper()
+
+	query := `
+	  query GetArticle($username: String!, $slug: String!) {
+	    article(username: $username, slug: $slug) {
+	      ... on ArticleSuccess {
+	        article { slug state content }
+	      }
+	      ... on ArticleError {
+	        errorCodes
+	      }
+	    }
+	  }`
+
+	var resp struct {
+		Article struct {
+			Article struct {
+				Slug    string `json:"slug"`
+				State   string `json:"state"`
+				Content string `json:"content"`
+			} `json:"article"`
+			ErrorCodes []string `json:"errorCodes"`
+		} `json:"article"`
+	}
+
+	c.gql(t, query, map[string]interface{}{
+		"username": c.username,
+		"slug":     slug,
+	}, &resp)
+
+	if len(resp.Article.ErrorCodes) > 0 {
+		t.Fatalf("article query returned errors for slug %q: %v", slug, resp.Article.ErrorCodes)
+	}
+
+	return resp.Article.Article.State, resp.Article.Article.Content
+}
+
+func testVerifyArchivedArticleOpenable(t *testing.T, c *omnivoreClient) {
+	t.Helper()
+
+	nodes := c.search(t, "in:archive", false)
+	var archived *searchNode
+	for i := range nodes {
+		if nodes[i].URL == archiveArticleURL {
+			archived = &nodes[i]
+			break
+		}
+	}
+	if archived == nil {
+		t.Fatalf("archived article %q not found for openability check", archiveArticleURL)
+	}
+
+	state, content := queryArticleBySlug(t, c, archived.Slug)
+	if state != "ARCHIVED" {
+		t.Fatalf("archived article query should return state=ARCHIVED, got %s", state)
+	}
+	if content == "" {
+		t.Fatal("archived article content is empty")
+	}
+
+	t.Logf("✓ archived article can still be opened: slug=%s content_len=%d", archived.Slug, len(content))
+}
+
+func unarchiveArticle(t *testing.T, c *omnivoreClient, articleID string) {
+	t.Helper()
+
+	mutation := `
+	  mutation SetLinkArchived($input: ArchiveLinkInput!) {
+	    setLinkArchived(input: $input) {
+	      ... on ArchiveLinkSuccess { linkId message }
+	      ... on ArchiveLinkError   { message errorCodes }
+	    }
+	  }`
+
+	var resp struct {
+		SetLinkArchived struct {
+			LinkID     string   `json:"linkId"`
+			Message    string   `json:"message"`
+			ErrorCodes []string `json:"errorCodes"`
+		} `json:"setLinkArchived"`
+	}
+
+	c.gql(t, mutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"linkId":   articleID,
+			"archived": false,
+		},
+	}, &resp)
+
+	if len(resp.SetLinkArchived.ErrorCodes) > 0 {
+		t.Fatalf("setLinkArchived unarchive error: %v", resp.SetLinkArchived.ErrorCodes)
+	}
+	if resp.SetLinkArchived.LinkID != articleID {
+		t.Fatalf("setLinkArchived unarchived wrong article: got %s want %s", resp.SetLinkArchived.LinkID, articleID)
+	}
+}
+
+func testUnarchiveArticle(t *testing.T, c *omnivoreClient) {
+	t.Helper()
+
+	nodes := c.search(t, "in:archive", false)
+	var archived *searchNode
+	for i := range nodes {
+		if nodes[i].URL == archiveArticleURL {
+			archived = &nodes[i]
+			break
+		}
+	}
+	if archived == nil {
+		t.Fatalf("archived article %q not found for unarchive", archiveArticleURL)
+	}
+
+	unarchiveArticle(t, c, archived.ID)
+	t.Logf("article unarchived: id=%s", archived.ID)
+}
+
+func testVerifyArticleUnarchived(t *testing.T, c *omnivoreClient) {
+	t.Helper()
+
+	pollUntil(t, 30*time.Second, 2*time.Second, "article removed from archive and back in library", func() bool {
+		archiveNodes := c.search(t, "in:archive", false)
+		if findByURL(archiveNodes, archiveArticleURL) != nil {
+			return false
+		}
+		libraryNodes := c.search(t, "", false)
+		article := findByURL(libraryNodes, archiveArticleURL)
+		return article != nil && article.State == "SUCCEEDED"
+	})
+
+	t.Log("✓ archived article was unarchived back into library")
+}
+
+func ensureLabel(t *testing.T, c *omnivoreClient, name, color string) string {
+	t.Helper()
+
+	if id := findLabelIDByName(t, c, name); id != "" {
+		return id
+	}
+
+	mutation := `
+	  mutation CreateLabel($input: CreateLabelInput!) {
+	    createLabel(input: $input) {
+	      ... on CreateLabelSuccess { label { id name color } }
+	      ... on CreateLabelError   { errorCodes }
+	    }
+	  }`
+
+	var resp struct {
+		CreateLabel struct {
+			Label struct {
+				ID string `json:"id"`
+			} `json:"label"`
+			ErrorCodes []string `json:"errorCodes"`
+		} `json:"createLabel"`
+	}
+
+	c.gql(t, mutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":  name,
+			"color": color,
+		},
+	}, &resp)
+
+	if len(resp.CreateLabel.ErrorCodes) > 0 {
+		t.Fatalf("createLabel error: %v", resp.CreateLabel.ErrorCodes)
+	}
+
+	return resp.CreateLabel.Label.ID
+}
+
+func findLabelIDByName(t *testing.T, c *omnivoreClient, name string) string {
+	t.Helper()
+
+	query := `
+	  query Labels {
+	    labels {
+	      ... on LabelsSuccess { labels { id name } }
+	      ... on LabelsError   { errorCodes }
+	    }
+	  }`
+
+	var resp struct {
+		Labels struct {
+			Labels []struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			} `json:"labels"`
+			ErrorCodes []string `json:"errorCodes"`
+		} `json:"labels"`
+	}
+
+	c.gql(t, query, nil, &resp)
+
+	if len(resp.Labels.ErrorCodes) > 0 {
+		t.Fatalf("labels query error: %v", resp.Labels.ErrorCodes)
+	}
+
+	for _, label := range resp.Labels.Labels {
+		if label.Name == name {
+			return label.ID
+		}
+	}
+
+	return ""
 }
 
 func testAddRSSFeed(t *testing.T, c *omnivoreClient) {

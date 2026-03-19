@@ -44,19 +44,28 @@ services:
         condition: service_healthy
 
   omnivore-api:
-    image: "ghcr.io/omnivore-app/sh-backend:latest"
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z 0.0.0.0 8080 || exit 1"]
-      interval: 15s
-      timeout: 90s
-      retries: 6
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    environment:
+      - PORT=8080
+      - API_ENV=dev
     env_file:
       - .env
     extra_hosts:
       - "omnivore-testsite:host-gateway"
     depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     networks:
       - default
 

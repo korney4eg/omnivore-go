@@ -190,12 +190,27 @@ const searchQuery = `
       ... on SearchSuccess {
         edges {
           node {
-            id title slug url state wordsCount content folder subscription
+            id title slug url state wordsCount folder subscription
             labels { id name color }
           }
         }
       }
       ... on SearchError { errorCodes }
+    }
+  }`
+
+const articleContentQuery = `
+  query GetArticleContent($username: String!, $slug: String!) {
+    article(username: $username, slug: $slug) {
+      ... on ArticleSuccess {
+        article {
+          slug
+          content
+        }
+      }
+      ... on ArticleError {
+        errorCodes
+      }
     }
   }`
 
@@ -221,7 +236,39 @@ func (c *omnivoreClient) search(t *testing.T, query string, includeContent bool)
 	for _, e := range resp.Search.Edges {
 		nodes = append(nodes, e.Node)
 	}
+
+	if includeContent {
+		for i := range nodes {
+			nodes[i].Content = c.articleContentBySlug(t, nodes[i].Slug)
+		}
+	}
+
 	return nodes
+}
+
+func (c *omnivoreClient) articleContentBySlug(t *testing.T, slug string) string {
+	t.Helper()
+
+	var resp struct {
+		Article struct {
+			Article struct {
+				Slug    string `json:"slug"`
+				Content string `json:"content"`
+			} `json:"article"`
+			ErrorCodes []string `json:"errorCodes"`
+		} `json:"article"`
+	}
+
+	c.gql(t, articleContentQuery, map[string]interface{}{
+		"username": c.username,
+		"slug":     slug,
+	}, &resp)
+
+	if len(resp.Article.ErrorCodes) > 0 {
+		t.Fatalf("article query returned errors for slug %q: %v", slug, resp.Article.ErrorCodes)
+	}
+
+	return resp.Article.Article.Content
 }
 
 // findByURL returns the first node whose URL contains substr.

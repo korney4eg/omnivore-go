@@ -1,0 +1,583 @@
+# Omnivore GraphQL API Schema
+
+scalar Date
+
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+# Enums
+enum LibraryItemState {
+  SUCCEEDED
+  PROCESSING
+  FAILED
+  DELETED
+  ARCHIVED
+}
+
+enum ContentReader {
+  WEB
+  PDF
+  EPUB
+}
+
+enum PageType {
+  ARTICLE
+  BOOK
+  FILE
+  PROFILE
+  WEBSITE
+  HIGHLIGHTS
+  UNKNOWN
+}
+
+enum SubscriptionType {
+  RSS
+  NEWSLETTER
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  UNSUBSCRIBED
+  DELETED
+}
+
+enum FetchContentType {
+  ALWAYS
+  NEVER
+  WHEN_EMPTY
+}
+
+enum SortBy {
+  UPDATED_TIME
+  CREATED_TIME
+  SCORE
+  SAVED_AT
+  PUBLISHED_AT
+}
+
+enum SortOrder {
+  ASCENDING
+  DESCENDING
+}
+
+# Error Codes
+enum SearchErrorCode {
+  QUERY_TOO_LONG
+  UNAUTHORIZED
+}
+
+enum SaveErrorCode {
+  EMBEDDED_HIGHLIGHT_FAILED
+  UNAUTHORIZED
+  UNKNOWN
+}
+
+enum ArticleErrorCode {
+  BAD_DATA
+  NOT_FOUND
+  UNAUTHORIZED
+}
+
+enum CreateLabelErrorCode {
+  BAD_REQUEST
+  LABEL_ALREADY_EXISTS
+  NOT_FOUND
+  UNAUTHORIZED
+}
+
+enum LabelsErrorCode {
+  BAD_REQUEST
+  NOT_FOUND
+  UNAUTHORIZED
+}
+
+enum SetLabelsErrorCode {
+  BAD_REQUEST
+  NOT_FOUND
+  UNAUTHORIZED
+}
+
+enum CreateHighlightErrorCode {
+  ALREADY_EXISTS
+  BAD_DATA
+  FORBIDDEN
+  NOT_FOUND
+  UNAUTHORIZED
+}
+
+enum UpdateHighlightErrorCode {
+  BAD_REQUEST
+  FORBIDDEN
+  NOT_FOUND
+  UNAUTHORIZED
+}
+
+enum DeleteHighlightErrorCode {
+  FORBIDDEN
+  NOT_FOUND
+  UNAUTHORIZED
+}
+
+enum UpdatePageErrorCode {
+  BAD_REQUEST
+  FORBIDDEN
+  NOT_FOUND
+  UNAUTHORIZED
+  UPDATE_FAILED
+}
+
+enum SetBookmarkArticleErrorCode {
+  NOT_FOUND
+  BOOKMARK_EXISTS
+}
+
+enum ArchiveLinkErrorCode {
+  BAD_REQUEST
+  FORBIDDEN
+  NOT_FOUND
+  UNAUTHORIZED
+  UPDATE_FAILED
+}
+
+enum SubscribeErrorCode {
+  UNAUTHORIZED
+  BAD_REQUEST
+  NOT_FOUND
+  ALREADY_SUBSCRIBED
+  EXCEEDED_MAX_SUBSCRIPTIONS
+}
+
+# Types
+type User {
+  id: ID!
+  name: String!
+  email: String
+  source: String
+  intercomHash: String
+  isFullUser: Boolean
+  featureList: [Feature!]
+  profile: Profile!
+}
+
+type Profile {
+  id: ID!
+  username: String!
+  bio: String
+  pictureUrl: String
+}
+
+type Feature {
+  id: ID!
+  name: String!
+  createdAt: Date!
+  updatedAt: Date!
+  grantedAt: Date
+  expiresAt: Date
+}
+
+type LibraryItem {
+  id: ID!
+  slug: String!
+  title: String
+  author: String
+  description: String
+  url: String!
+  pageId: ID
+  pageType: PageType!
+  contentReader: ContentReader!
+  createdAt: Date!
+  updatedAt: Date
+  thumbnail: String
+  image: String
+  state: LibraryItemState!
+  savedAt: Date!
+  readAt: Date
+  archivedAt: Date
+  publishedAt: Date
+  readingProgressPercent: Float!
+  readingProgressTopPercent: Float
+  readingProgressAnchorIndex: Int!
+  ownedByViewer: Boolean
+  originalArticleUrl: String
+  uploadFileId: ID
+  shortId: String
+  quote: String
+  annotation: String
+  siteName: String
+  siteIcon: String
+  subscription: String
+  wordsCount: Int
+  highlightsCount: Int
+  folder: String!
+  labels: [Label!]!
+  highlights: [Highlight!]!
+}
+
+input ArticleHighlightsInput {
+  includeFriends: Boolean
+}
+
+type RecommendingUser {
+  userId: String!
+  name: String!
+  username: String!
+  profileImageURL: String
+}
+
+type Recommendation {
+  id: ID!
+  name: String!
+  note: String
+  user: RecommendingUser
+  recommendedAt: Date!
+}
+
+type Article {
+  id: ID!
+  slug: String!
+  title: String
+  author: String
+  description: String
+  url: String!
+  pageType: PageType!
+  contentReader: ContentReader!
+  createdAt: Date!
+  updatedAt: Date
+  image: String
+  state: LibraryItemState!
+  savedAt: Date!
+  readAt: Date
+  archivedAt: Date
+  publishedAt: Date
+  readingProgressPercent: Float!
+  readingProgressTopPercent: Float
+  readingProgressAnchorIndex: Int!
+  originalArticleUrl: String
+  uploadFileId: ID
+  siteName: String
+  siteIcon: String
+  subscription: String
+  wordsCount: Int
+  folder: String!
+  linkId: ID
+  content: String!
+  originalHtml: String
+  labels: [Label!]!
+  highlights(input: ArticleHighlightsInput): [Highlight!]!
+  recommendations: [Recommendation!]
+}
+
+type Label {
+  id: ID!
+  name: String!
+  color: String!
+  description: String
+  createdAt: Date
+}
+
+type Highlight {
+  id: ID!
+  type: String!
+  shortId: String!
+  quote: String
+  prefix: String
+  suffix: String
+  patch: String
+  annotation: String
+  color: String
+  createdByMe: Boolean!
+  createdAt: Date!
+  updatedAt: Date!
+  sharedAt: Date
+  highlightPositionPercent: Float
+  highlightPositionAnchorIndex: Int
+  labels: [Label!]
+}
+
+type Subscription {
+  id: ID!
+  name: String!
+  newsletterEmail: String
+  url: String
+  description: String
+  status: SubscriptionStatus!
+  unsubscribeMailTo: String
+  unsubscribeHttpUrl: String
+  icon: String
+  type: SubscriptionType!
+  count: Int!
+  lastFetchedAt: Date
+  createdAt: Date!
+  updatedAt: Date
+  isPrivate: Boolean
+  autoAddToLibrary: Boolean
+  fetchContent: Boolean!
+  fetchContentType: FetchContentType!
+  folder: String!
+  mostRecentItemDate: Date
+  refreshedAt: Date
+  failedAt: Date
+}
+
+input SortParams {
+  by: SortBy
+  order: SortOrder
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+  totalCount: Int
+}
+
+type SearchItemEdge {
+  node: LibraryItem!
+  cursor: String!
+}
+
+# Search Result Types
+type SearchSuccess {
+  edges: [SearchItemEdge!]!
+  pageInfo: PageInfo!
+}
+
+type SearchError {
+  errorCodes: [SearchErrorCode!]!
+}
+
+union SearchResult = SearchSuccess | SearchError
+
+# Save Result Types
+type SaveSuccess {
+  url: String!
+  clientRequestId: ID!
+}
+
+type SaveError {
+  errorCodes: [SaveErrorCode!]!
+  message: String
+}
+
+union SaveResult = SaveSuccess | SaveError
+
+# Article Result Types
+type ArticleSuccess {
+  article: Article!
+}
+
+type ArticleError {
+  errorCodes: [ArticleErrorCode!]!
+}
+
+union ArticleResult = ArticleSuccess | ArticleError
+
+type LabelsSuccess {
+  labels: [Label!]!
+}
+
+type LabelsError {
+  errorCodes: [LabelsErrorCode!]!
+}
+
+union LabelsResult = LabelsSuccess | LabelsError
+
+# Create Label Result Types
+type CreateLabelSuccess {
+  label: Label!
+}
+
+type CreateLabelError {
+  errorCodes: [CreateLabelErrorCode!]!
+}
+
+union CreateLabelResult = CreateLabelSuccess | CreateLabelError
+
+# Set Labels Result Types
+type SetLabelsSuccess {
+  labels: [Label!]!
+}
+
+type SetLabelsError {
+  errorCodes: [SetLabelsErrorCode!]!
+}
+
+union SetLabelsResult = SetLabelsSuccess | SetLabelsError
+
+type SetBookmarkArticleSuccess {
+  bookmarkedArticle: Article!
+}
+
+type SetBookmarkArticleError {
+  errorCodes: [SetBookmarkArticleErrorCode!]!
+}
+
+union SetBookmarkArticleResult = SetBookmarkArticleSuccess | SetBookmarkArticleError
+
+type ArchiveLinkSuccess {
+  linkId: ID!
+  message: String
+}
+
+type ArchiveLinkError {
+  message: String
+  errorCodes: [ArchiveLinkErrorCode!]!
+}
+
+union ArchiveLinkResult = ArchiveLinkSuccess | ArchiveLinkError
+
+type SubscribeSuccess {
+  subscriptions: [Subscription!]!
+}
+
+type SubscribeError {
+  errorCodes: [SubscribeErrorCode!]!
+}
+
+union SubscribeResult = SubscribeSuccess | SubscribeError
+
+# Create Highlight Result Types
+type CreateHighlightSuccess {
+  highlight: Highlight!
+}
+
+type CreateHighlightError {
+  errorCodes: [CreateHighlightErrorCode!]!
+}
+
+union CreateHighlightResult = CreateHighlightSuccess | CreateHighlightError
+
+# Update Highlight Result Types
+type UpdateHighlightSuccess {
+  highlight: Highlight!
+}
+
+type UpdateHighlightError {
+  errorCodes: [UpdateHighlightErrorCode!]!
+}
+
+union UpdateHighlightResult = UpdateHighlightSuccess | UpdateHighlightError
+
+# Delete Highlight Result Types
+type DeleteHighlightSuccess {
+  highlight: Highlight!
+}
+
+type DeleteHighlightError {
+  errorCodes: [DeleteHighlightErrorCode!]!
+}
+
+union DeleteHighlightResult = DeleteHighlightSuccess | DeleteHighlightError
+
+# Update Page Result Types
+type UpdatePageSuccess {
+  updatedPage: LibraryItem!
+}
+
+type UpdatePageError {
+  errorCodes: [UpdatePageErrorCode!]!
+}
+
+union UpdatePageResult = UpdatePageSuccess | UpdatePageError
+
+# Input types
+input SaveUrlInput {
+  clientRequestId: ID
+  url: String!
+  source: String
+  timezone: String
+  locale: String
+}
+
+input SavePageInput {
+  clientRequestId: ID
+  url: String!
+  originalHtml: String!
+  title: String
+  source: String
+}
+
+input CreateLabelInput {
+  name: String!
+  color: String
+  description: String
+}
+
+input SetLabelsInput {
+  pageId: ID!
+  labelIds: [ID!]!
+}
+
+input SetBookmarkArticleInput {
+  articleID: ID!
+  bookmark: Boolean!
+}
+
+input ArchiveLinkInput {
+  linkId: ID!
+  archived: Boolean!
+}
+
+input SubscribeInput {
+  url: String!
+  subscriptionType: SubscriptionType
+  isPrivate: Boolean
+  autoAddToLibrary: Boolean
+  fetchContent: Boolean
+  fetchContentType: FetchContentType
+  folder: String
+}
+
+input CreateHighlightInput {
+  id: ID!
+  shortId: String!
+  articleId: ID!
+  quote: String
+  annotation: String
+  patch: String
+  color: String
+}
+
+input UpdateHighlightInput {
+  highlightId: ID!
+  annotation: String
+  color: String
+}
+
+input UpdatePageInput {
+  pageId: ID!
+  title: String
+  description: String
+  savedAt: Date
+  readingProgressPercent: Float
+  state: LibraryItemState
+}
+
+# Query type
+type Query {
+  hello: String!
+  me: User!
+  article(id: ID, slug: String, username: String): ArticleResult
+  labels: LabelsResult!
+  highlights(libraryItemId: ID): [Highlight!]!
+  subscriptions(sort: SortParams, type: SubscriptionType): [Subscription!]!
+  search(after: String, first: Int, query: String, includeContent: Boolean): SearchResult!
+}
+
+# Mutation type
+type Mutation {
+  saveUrl(input: SaveUrlInput!): SaveResult!
+  savePage(input: SavePageInput!): SaveResult!
+  createLabel(input: CreateLabelInput!): CreateLabelResult!
+  setLabels(input: SetLabelsInput!): SetLabelsResult!
+  setBookmarkArticle(input: SetBookmarkArticleInput!): SetBookmarkArticleResult!
+  setLinkArchived(input: ArchiveLinkInput!): ArchiveLinkResult!
+  subscribe(input: SubscribeInput!): SubscribeResult!
+  createHighlight(input: CreateHighlightInput!): CreateHighlightResult!
+  updateHighlight(input: UpdateHighlightInput!): UpdateHighlightResult!
+  deleteHighlight(highlightId: ID!): DeleteHighlightResult!
+  updatePage(input: UpdatePageInput!): UpdatePageResult!
+}
