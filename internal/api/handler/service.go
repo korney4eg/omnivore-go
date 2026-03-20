@@ -4,20 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"runtime"
-
-	"github.com/omnivore-app/omnivore/internal/config"
 )
 
 // ServiceHandler handles service endpoints.
-type ServiceHandler struct {
-	cfg *config.Config
-}
+type ServiceHandler struct{}
 
 // NewServiceHandler creates a new service handler.
-func NewServiceHandler(cfg *config.Config) *ServiceHandler {
-	return &ServiceHandler{
-		cfg: cfg,
-	}
+func NewServiceHandler() *ServiceHandler {
+	return &ServiceHandler{}
 }
 
 // VersionResponse represents version info.

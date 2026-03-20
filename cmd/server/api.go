@@ -38,7 +38,7 @@ func init() {
 }
 
 func runAPI(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg := config.LoadAPI()
 
 	// Validate required config
 	if cfg.DatabaseURL == "" {
@@ -79,7 +79,8 @@ func runAPI(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("redis ping failed: %w", err)
 	}
 
-	// Initialize storage client (optional - will be nil if not configured)
+	// Initialize storage client. Config.BlobURL() defaults to MinIO-compatible
+	// object storage for self-hosted setups when no explicit blob URL is set.
 	var storageClient *storage.Client
 	if cfg.BlobURL() != "" {
 		storageClient, err = storage.New(context.Background(), cfg.BlobURL())
@@ -90,8 +91,6 @@ func runAPI(cmd *cobra.Command, args []string) error {
 			defer storageClient.Close()
 			fmt.Printf("✓ Connected to blob storage (%s)\n", cfg.BlobURL())
 		}
-	} else {
-		fmt.Printf("⚠ BLOB_STORAGE_URL not configured (HTML uploads disabled)\n")
 	}
 
 	// Create GraphQL server
@@ -127,7 +126,7 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	)
 	articleHandler := apihandler.NewArticleHandler(db.GetGorm(), libraryItemRepo, labelRepo)
 	contentHandler := apihandler.NewContentHandler(db.GetGorm(), libraryItemRepo)
-	serviceHandler := apihandler.NewServiceHandler(cfg)
+	serviceHandler := apihandler.NewServiceHandler()
 
 	// Create HTTP router
 	mux := http.NewServeMux()
@@ -173,8 +172,7 @@ func runAPI(cmd *cobra.Command, args []string) error {
 	// GraphQL endpoint
 	mux.Handle("/api/graphql", gqlServer)
 
-	// GraphQL Playground (for development)
-	if cfg.APIEnv == "local" || cfg.APIEnv == "dev" {
+	if cfg.EnableGraphQLPlayground {
 		mux.Handle("/api/playground", playground.Handler("GraphQL Playground", "/api/graphql"))
 		fmt.Printf("✓ GraphQL Playground enabled at /api/playground\n")
 	}

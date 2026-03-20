@@ -15,10 +15,10 @@ content_fetch_go:
 content_fetch_go_build:
 	go build -o bin/omnivore .
 
-# ── Docker images ───────────────────────────────────────────────────────────
+# ── Docker image ────────────────────────────────────────────────────────────
 
 docker_build_content_fetcher:
-	docker build -f docker/content-fetcher.Dockerfile \
+	docker build -f Dockerfile \
 		-t $(REGISTRY)/omnivore-content-fetcher:$(IMAGE_TAG) .
 
 docker_push_content_fetcher: docker_build_content_fetcher
@@ -38,7 +38,7 @@ deploy_down:
 
 DEV_DIR ?= dev
 
-# Bring up the dev stack (builds content-fetcher from local Dockerfile).
+# Bring up the dev stack (builds the shared Go image from the root Dockerfile).
 # Uses project name "omnivore-dev" so container names don't conflict with the
 # deploy stack (which runs on port 80; dev runs on port 81).
 dev_up:
@@ -85,4 +85,3 @@ test_integration_clean_dev: dev_down dev_up
 	@echo "Waiting 30s for stack to initialise..."
 	@sleep 30
 	OMNIVORE_URL=http://omnivore-dev:81 HUGO_DIR=$(HUGO_DIR) go test ./tests/integration/... -v -timeout 5m
-

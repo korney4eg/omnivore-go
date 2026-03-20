@@ -11,12 +11,10 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o omnivore .
 
-# ─── Runtime image ────────────────────────────────────────────────────────────
 FROM alpine:3.20
 
 LABEL org.opencontainers.image.source="https://github.com/omnivore-app/omnivore"
 
-# Add Chromium and required fonts/libs from Alpine edge
 RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories \
  && echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories \
  && echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories \
@@ -37,12 +35,10 @@ ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV LAUNCH_HEADLESS=true
 ENV PORT=8080
 
-# Download ad/tracker block-list to a separate file; appended to /etc/hosts at startup
 RUN wget -q -O /etc/hosts.blocklist https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
 
 COPY --from=build /app/omnivore .
 
-# Entrypoint: append the blocklist to /etc/hosts (which is writable at runtime), then exec the binary
 RUN printf '#!/bin/sh\ncat /etc/hosts.blocklist >> /etc/hosts\nexec "$@"\n' > /entrypoint.sh \
  && chmod +x /entrypoint.sh
 

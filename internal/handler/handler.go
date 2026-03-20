@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/omnivore-app/omnivore/internal/analytics"
 	"github.com/omnivore-app/omnivore/internal/browser"
 	"github.com/omnivore-app/omnivore/internal/bullmq"
 	"github.com/omnivore-app/omnivore/internal/config"
@@ -129,27 +128,6 @@ func ProcessFetchContentJob(
 	defer func() {
 		totalTime := time.Since(functionStartTime).Milliseconds()
 		log.Printf("parse-page result url=%s totalTime=%dms error=%v", data.URL, totalTime, processErr)
-
-		// Analytics
-		userIDs := make([]string, len(users))
-		for i, u := range users {
-			userIDs[i] = u.ID
-		}
-		result := "success"
-		var errMsg string
-		if processErr != nil {
-			result = "failure"
-			errMsg = processErr.Error()
-		}
-		analyticsClient := analytics.New(config)
-		analyticsClient.Capture(userIDs, analytics.Event{
-			Result:       result,
-			URL:          data.URL,
-			Source:       source,
-			TotalTime:    totalTime,
-			ErrorMessage: errMsg,
-		})
-		analyticsClient.Close()
 
 		// Import status update on final failure attempt
 		lastAttempt := attemptsMade+1 >= maxImportAttempts

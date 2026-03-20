@@ -1,4 +1,3 @@
-version: '3'
 x-postgres:
   &postgres-common
   image: "ankane/pgvector:v0.5.1"
@@ -8,6 +7,9 @@ x-postgres:
     interval: 2s
     timeout: 12s
     retries: 3
+x-omnivore-go-image:
+  &omnivore-go-image
+  image: "korney4eg/omnivore-content-fetcher:20260306"
 
 services:
   nginx:
@@ -47,8 +49,9 @@ services:
         condition: service_healthy
 
   omnivore-api:
-    image: "ghcr.io/omnivore-app/sh-backend:latest"
+    <<: *omnivore-go-image
     container_name: "omnivore-api"
+    command: ["./omnivore", "server", "api"]
     healthcheck:
       test: ["CMD-SHELL", "nc -z 0.0.0.0 8080 || exit 1"]
       interval: 15s
@@ -65,8 +68,9 @@ services:
       - default
 
   queue-processor:
-    image: "ghcr.io/omnivore-app/sh-queue-processor:latest"
+    <<: *omnivore-go-image
     container_name: "omnivore-queue-processor"
+    command: ["./omnivore", "server", "queue-processor"]
     env_file:
       - .env
     extra_hosts:
@@ -93,10 +97,11 @@ services:
       - .env
 
   content-fetch:
-    image: "korney4eg/omnivore-content-fetcher:20260306"
+    <<: *omnivore-go-image
     container_name: "omnivore-content-fetch"
     environment:
       - USE_FIREFOX=true
+    command: ["./omnivore", "server", "content-fetcher"]
     env_file:
       - .env
     extra_hosts:

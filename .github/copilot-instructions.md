@@ -19,11 +19,11 @@ Convenience targets are defined in the `Makefile`:
 |---|---|
 | `make content_fetch_go` | Run the service via `go run . server content-fetcher` |
 | `make content_fetch_go_build` | Compile to `bin/omnivore` |
-| `make docker_build_content_fetcher` | Build the Docker image (see below) |
-| `make docker_push_content_fetcher` | Build and push (`REGISTRY` and `IMAGE_TAG` are overridable) |
+| `make docker_build_content_fetcher` | Build the shared Go service image (see below) |
+| `make docker_push_content_fetcher` | Build and push the shared Go service image (`REGISTRY` and `IMAGE_TAG` are overridable) |
 | `make deploy_up` | Bring up the reference deploy stack |
 | `make deploy_down` | Tear down the stack and wipe all volumes |
-| `make dev_up` | Build content-fetcher from local Dockerfile and bring up dev stack |
+| `make dev_up` | Build the shared Go image from the root Dockerfile and bring up dev stack |
 | `make dev_down` | Tear down the dev stack and wipe all volumes |
 | `make test_integration` | Run integration tests (deploy stack must be running) |
 | `make test_integration_clean` | Reset deploy stack + run integration tests |
@@ -46,7 +46,7 @@ Raw Go toolchain equivalents:
 - Test all: `go test ./...`
 - Single test: `go test ./internal/handler -run TestJobData_UnmarshalLabelsAsObjects -count=1`
 
-**Docker:** `docker/content-fetcher.Dockerfile` uses the repository root as the build context. Build with `make docker_build_content_fetcher` (or `docker build -f docker/content-fetcher.Dockerfile -t <image> .`). The runtime image uses Alpine with Chromium from the edge repo and appends a host-based ad/tracker blocklist at startup.
+**Docker:** The repository root `Dockerfile` builds a single shared Go service image. Build with `make docker_build_content_fetcher` (or `docker build -f Dockerfile -t <image> .`). The runtime image uses Alpine with Chromium from the edge repo and appends a host-based ad/tracker blocklist at startup. Run different services by overriding the command, e.g. `./omnivore server api`, `./omnivore server queue-processor`, or `./omnivore server content-fetcher`.
 
 All configuration is provided via environment variables. Copy `.env` from the repository root and fill in the required values — it contains every supported variable with defaults. The minimum required at startup are `VERIFICATION_TOKEN` and `REDIS_URL`. The service defaults to port 3002 (override with `PORT`).
 
@@ -54,10 +54,10 @@ All configuration is provided via environment variables. Copy `.env` from the re
 
 There are two stacks:
 
-| Stack | Folder | Hostname | Port | content-fetcher |
+| Stack | Folder | Hostname | Port | Go services image |
 |---|---|---|---|---|
-| `deploy` | `deploy/` | `omnivore-deploy` | 80 | published image `korney4eg/omnivore-content-fetcher` |
-| `dev` | `dev/` | `omnivore-dev` | 81 | built from local `docker/content-fetcher.Dockerfile` |
+| `deploy` | `deploy/` | `omnivore-deploy` | 80 | published image `korney4eg/omnivore-content-fetcher` shared by API, queue-processor, and content-fetcher |
+| `dev` | `dev/` | `omnivore-dev` | 81 | built from the root `Dockerfile` and reused by API, queue-processor, and content-fetcher |
 
 Both stacks can run **simultaneously** without conflict:
 - Dev uses port 81 (deploy uses 80)
@@ -68,7 +68,7 @@ Both stacks can run **simultaneously** without conflict:
 make deploy_up    # bring up deploy stack
 make deploy_down  # tear down + wipe volumes
 
-make dev_up       # build content-fetcher locally and bring up dev stack
+make dev_up       # build the shared Go image locally and bring up dev stack
 make dev_down     # tear down + wipe volumes
 ```
 
@@ -150,7 +150,7 @@ Do not treat the HTTP handler path and queue worker path as separate implementat
 
 `internal/config.Config` is env-only configuration. Prefer adding new settings there instead of reading environment variables ad hoc in other packages.
 
-For object storage, prefer `BLOB_STORAGE_URL`. `Config.BlobURL()` keeps legacy `GCS_UPLOAD_BUCKET` behavior for backward compatibility, and `handler.ProcessFetchContentJob` still bridges `GCS_UPLOAD_SA_KEY_FILE_PATH` into `GOOGLE_APPLICATION_CREDENTIALS`.
+For object storage, prefer `BLOB_STORAGE_URL`. `Config.BlobURL()` defaults self-hosted setups to a MinIO-compatible `s3://` URL and still preserves legacy `gs://` behavior when `GCS_UPLOAD_SA_KEY_FILE_PATH` is configured. `handler.ProcessFetchContentJob` still bridges `GCS_UPLOAD_SA_KEY_FILE_PATH` into `GOOGLE_APPLICATION_CREDENTIALS`.
 
 Redis is split by responsibility: `RedisDataSource.CacheClient` is for fetch caching and failure counters, while `MQClient` is for BullMQ state. `MQClient` may intentionally alias `CacheClient` when only one Redis URL is configured.
 

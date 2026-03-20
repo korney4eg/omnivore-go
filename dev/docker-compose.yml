@@ -1,4 +1,3 @@
-version: '3'
 x-postgres:
   &postgres-common
   image: "ankane/pgvector:v0.5.1"
@@ -8,6 +7,11 @@ x-postgres:
     interval: 2s
     timeout: 12s
     retries: 3
+x-omnivore-go:
+  &omnivore-go
+  build:
+    context: ..
+    dockerfile: Dockerfile
 
 services:
   nginx:
@@ -44,14 +48,14 @@ services:
         condition: service_healthy
 
   omnivore-api:
-    build:
-      context: ..
-      dockerfile: docker/api.Dockerfile
+    <<: *omnivore-go
     environment:
       - PORT=8080
-      - API_ENV=dev
+    command: ["/bin/sh", "-lc", "export JWT_SECRET=\"$(cat /run/secrets/jwt_private.pem)\" && exec ./omnivore server api"]
     env_file:
       - .env
+    volumes:
+      - ../jwt_private_dev.pem:/run/secrets/jwt_private.pem:ro
     extra_hosts:
       - "omnivore-testsite:host-gateway"
     depends_on:
@@ -70,9 +74,8 @@ services:
       - default
 
   queue-processor:
-    build:
-      context: ..
-      dockerfile: docker/queue-processor.Dockerfile
+    <<: *omnivore-go
+    command: ["./omnivore", "server", "queue-processor"]
     env_file:
       - .env
     extra_hosts:
@@ -97,13 +100,14 @@ services:
       - .env
 
   content-fetch:
-    build:
-      context: ..
-      dockerfile: docker/content-fetcher.Dockerfile
+    <<: *omnivore-go
     environment:
       - USE_FIREFOX=true
+    command: ["/bin/sh", "-lc", "export JWT_SECRET=\"$(cat /run/secrets/jwt_private.pem)\" && exec ./omnivore server content-fetcher"]
     env_file:
       - .env
+    volumes:
+      - ../jwt_private_dev.pem:/run/secrets/jwt_private.pem:ro
     extra_hosts:
       - "omnivore-testsite:host-gateway"
     depends_on:

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/omnivore-app/omnivore/internal/config"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -18,15 +17,22 @@ type RedisDataSource struct {
 	MQClient    *redis.Client
 }
 
-func New(cfg *config.Config) (*RedisDataSource, error) {
-	cacheClient, err := newClient(cfg.RedisURL, cfg.RedisCert)
+type Config interface {
+	CacheRedisConfig() (string, string)
+	MQRedisConfig() (string, string)
+}
+
+func New(cfg Config) (*RedisDataSource, error) {
+	cacheRedisURL, cacheRedisCert := cfg.CacheRedisConfig()
+	cacheClient, err := newClient(cacheRedisURL, cacheRedisCert)
 	if err != nil {
 		return nil, fmt.Errorf("cache redis: %w", err)
 	}
 
 	mqClient := cacheClient
-	if cfg.MQRedisURL != "" {
-		mqClient, err = newClient(cfg.MQRedisURL, cfg.MQRedisCert)
+	mqRedisURL, mqRedisCert := cfg.MQRedisConfig()
+	if mqRedisURL != "" {
+		mqClient, err = newClient(mqRedisURL, mqRedisCert)
 		if err != nil {
 			return nil, fmt.Errorf("mq redis: %w", err)
 		}

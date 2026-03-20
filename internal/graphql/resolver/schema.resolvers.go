@@ -93,7 +93,7 @@ func (r *mutationResolver) SavePage(ctx context.Context, input model.SavePageInp
 	if r.SavePageService == nil {
 		return &model.SaveError{
 			ErrorCodes: []model.SaveErrorCode{model.SaveErrorCodeUnknown},
-			Message:    strPtr("storage not configured: HTML upload requires BLOB_STORAGE_URL"),
+			Message:    strPtr("storage not configured: HTML upload requires a working blob storage backend"),
 		}, nil
 	}
 
