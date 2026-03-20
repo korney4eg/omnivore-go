@@ -10,6 +10,11 @@ x-postgres:
 x-omnivore-go-image:
   &omnivore-go-image
   image: "korney4eg/omnivore-content-fetcher:20260306"
+x-omnivore-go-build:
+  &omnivore-go-build
+  build:
+    context: ..
+    dockerfile: Dockerfile
 
 services:
   nginx:
@@ -36,12 +41,10 @@ services:
     env_file:
       - .env
 
-  migrate:
-    image: "ghcr.io/omnivore-app/sh-migrate:latest"
-    container_name: "omnivore-migrate"
-    command: '/bin/bash /setup_db.bash'
-    volumes:
-      - ../setup_db.bash:/setup_db.bash
+  bootstrap:
+    <<: *omnivore-go-build
+    container_name: "omnivore-bootstrap"
+    entrypoint: ["/bin/sh", "/app/bootstrap-db.sh"]
     env_file:
       - .env
     depends_on:
@@ -62,7 +65,7 @@ services:
     extra_hosts:
       - "omnivore-testsite:host-gateway"
     depends_on:
-      migrate:
+      bootstrap:
         condition: service_completed_successfully
     networks:
       - default

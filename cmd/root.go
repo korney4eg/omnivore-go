@@ -13,10 +13,14 @@ var rootCmd = &cobra.Command{
 	Long: `omnivore is the single binary for running Omnivore services.
 
 Available commands:
+  omnivore db run-migrations      Apply bootstrap SQL files to PostgreSQL
+  omnivore user create            Create an email/password user
   omnivore server content-fetcher   Start the content-fetch worker and HTTP server`,
 }
 
 func init() {
+	rootCmd.AddCommand(dbCmd)
+	rootCmd.AddCommand(userCmd)
 	rootCmd.AddCommand(server.Cmd)
 }
 

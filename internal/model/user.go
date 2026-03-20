@@ -1,5 +1,5 @@
 // Package model contains GORM models for the Omnivore database.
-// These models match the existing PostgreSQL schema defined in packages/db/migrations/.
+// These models match the existing PostgreSQL schema defined in migrations/.
 // DO NOT use GORM auto-migration - schema is managed via SQL migrations.
 package model
 
@@ -31,25 +31,25 @@ const (
 // User represents a user account.
 // Table: omnivore.user
 type User struct {
-	ID            uuid.UUID        `gorm:"type:uuid;primary_key;default:uuid_generate_v1mc()"`
-	Name          string           `gorm:"type:text;not null"`
-	Source        RegistrationType `gorm:"type:registration_type;not null"`
-	Email         string           `gorm:"type:text"`
-	SourceUserID  string           `gorm:"column:source_user_id;type:text;not null"`
-	Password      *string          `gorm:"type:varchar(255)"`
-	Status        UserStatus       `gorm:"type:user_status_type;not null;default:'ACTIVE'"`
-	Phone         *string          `gorm:"type:text"`
-	Picture       *string          `gorm:"type:text"`
-	Bio           *string          `gorm:"type:text"`
-	CreatedAt     time.Time        `gorm:"type:timestamptz;not null;default:current_timestamp"`
-	UpdatedAt     time.Time        `gorm:"type:timestamptz;not null;default:current_timestamp"`
+	ID           uuid.UUID        `gorm:"type:uuid;primary_key;default:uuid_generate_v1mc()"`
+	Name         string           `gorm:"type:text;not null"`
+	Source       RegistrationType `gorm:"type:registration_type;not null"`
+	Email        string           `gorm:"type:text"`
+	SourceUserID string           `gorm:"column:source_user_id;type:text;not null"`
+	Password     *string          `gorm:"type:varchar(255)"`
+	Status       UserStatus       `gorm:"type:user_status_type;not null;default:'ACTIVE'"`
+	Phone        *string          `gorm:"type:text"`
+	Picture      *string          `gorm:"type:text"`
+	Bio          *string          `gorm:"type:text"`
+	CreatedAt    time.Time        `gorm:"type:timestamptz;not null;default:current_timestamp"`
+	UpdatedAt    time.Time        `gorm:"type:timestamptz;not null;default:current_timestamp"`
 
 	// Relationships
-	Profile              *Profile               `gorm:"foreignKey:UserID"`
-	LibraryItems         []LibraryItem          `gorm:"foreignKey:UserID"`
-	Labels               []Label                `gorm:"foreignKey:UserID"`
-	Subscriptions        []Subscription         `gorm:"foreignKey:UserID"`
-	UserPersonalization  *UserPersonalization   `gorm:"foreignKey:UserID"`
+	Profile             *Profile             `gorm:"foreignKey:UserID"`
+	LibraryItems        []LibraryItem        `gorm:"foreignKey:UserID"`
+	Labels              []Label              `gorm:"foreignKey:UserID"`
+	Subscriptions       []Subscription       `gorm:"foreignKey:UserID"`
+	UserPersonalization *UserPersonalization `gorm:"foreignKey:UserID"`
 }
 
 func (User) TableName() string {
@@ -59,14 +59,14 @@ func (User) TableName() string {
 // Profile represents a user's public profile.
 // Table: omnivore.user_profile
 type Profile struct {
-	ID        uuid.UUID  `gorm:"type:uuid;primary_key;default:uuid_generate_v1mc()"`
-	UserID    uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex"`
-	Username  string     `gorm:"type:text;not null;uniqueIndex"`
-	Bio       *string    `gorm:"type:text"`
+	ID         uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v1mc()"`
+	UserID     uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
+	Username   string    `gorm:"type:text;not null;uniqueIndex"`
+	Bio        *string   `gorm:"type:text"`
 	PictureURL *string   `gorm:"column:picture_url;type:text"`
-	Private   bool       `gorm:"not null;default:false"`
-	CreatedAt time.Time  `gorm:"type:timestamptz;not null;default:current_timestamp"`
-	UpdatedAt time.Time  `gorm:"type:timestamptz;not null;default:current_timestamp"`
+	Private    bool      `gorm:"not null;default:false"`
+	CreatedAt  time.Time `gorm:"type:timestamptz;not null;default:current_timestamp"`
+	UpdatedAt  time.Time `gorm:"type:timestamptz;not null;default:current_timestamp"`
 
 	User *User `gorm:"foreignKey:UserID"`
 }
@@ -78,19 +78,19 @@ func (Profile) TableName() string {
 // UserPersonalization stores user preferences and settings.
 // Table: omnivore.user_personalization
 type UserPersonalization struct {
-	ID             uuid.UUID  `gorm:"type:uuid;primary_key;default:uuid_generate_v1mc()"`
-	UserID         uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex"`
-	Theme          *string    `gorm:"type:text"`
-	FontSize       *int       `gorm:"type:integer"`
-	FontFamily     *string    `gorm:"type:text"`
-	Margin         *int       `gorm:"type:integer"`
-	LibraryLayoutType *string `gorm:"column:library_layout_type;type:text"`
-	LabelsView     *string    `gorm:"column:labels_view;type:text"`
-	Fields         *string    `gorm:"type:json"` // JSONB stored as string
-	DigestConfig   *string    `gorm:"column:digest_config;type:jsonb"` // JSONB stored as string
-	Shortcuts      *string    `gorm:"type:jsonb"` // JSONB stored as string
-	CreatedAt      time.Time  `gorm:"type:timestamptz;not null;default:current_timestamp"`
-	UpdatedAt      time.Time  `gorm:"type:timestamptz;not null;default:current_timestamp"`
+	ID                uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v1mc()"`
+	UserID            uuid.UUID `gorm:"type:uuid;not null;uniqueIndex"`
+	Theme             *string   `gorm:"type:text"`
+	FontSize          *int      `gorm:"type:integer"`
+	FontFamily        *string   `gorm:"type:text"`
+	Margin            *int      `gorm:"type:integer"`
+	LibraryLayoutType *string   `gorm:"column:library_layout_type;type:text"`
+	LabelsView        *string   `gorm:"column:labels_view;type:text"`
+	Fields            *string   `gorm:"type:json"`                       // JSONB stored as string
+	DigestConfig      *string   `gorm:"column:digest_config;type:jsonb"` // JSONB stored as string
+	Shortcuts         *string   `gorm:"type:jsonb"`                      // JSONB stored as string
+	CreatedAt         time.Time `gorm:"type:timestamptz;not null;default:current_timestamp"`
+	UpdatedAt         time.Time `gorm:"type:timestamptz;not null;default:current_timestamp"`
 
 	User *User `gorm:"foreignKey:UserID"`
 }

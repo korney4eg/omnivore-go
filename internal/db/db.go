@@ -87,7 +87,7 @@ func Connect(dsn string) (*sql.DB, error) {
 			return time.Now().UTC()
 		},
 		// IMPORTANT: Do NOT use auto-migration
-		// Schema is managed via SQL migrations in packages/db/migrations/
+		// Schema is managed via SQL migrations in the repository migrations/ directory.
 	})
 	if err != nil {
 		db.Close()

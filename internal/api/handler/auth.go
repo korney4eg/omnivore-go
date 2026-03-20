@@ -9,6 +9,7 @@ import (
 	"github.com/omnivore-app/omnivore/internal/auth"
 	"github.com/omnivore-app/omnivore/internal/db"
 	"github.com/omnivore-app/omnivore/internal/model"
+	"github.com/omnivore-app/omnivore/internal/service"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -17,6 +18,7 @@ import (
 type AuthHandler struct {
 	db        *gorm.DB
 	jwtConfig *auth.JWTConfig
+	userSvc   *service.UserService
 }
 
 // NewAuthHandler creates a new auth handler.
@@ -24,6 +26,7 @@ func NewAuthHandler(database *gorm.DB, jwtConfig *auth.JWTConfig) *AuthHandler {
 	return &AuthHandler{
 		db:        database,
 		jwtConfig: jwtConfig,
+		userSvc:   service.NewUserService(database),
 	}
 }
 
@@ -138,60 +141,28 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user already exists
-	var existingUser model.User
-	err := h.db.WithContext(r.Context()).
-		Where("email = ?", req.Email).
-		First(&existingUser).Error
-
-	if err == nil {
-		respondError(w, "User already exists", http.StatusConflict)
-		return
-	}
-
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		respondError(w, "Failed to hash password", http.StatusInternalServerError)
-		return
-	}
-
-	// Create user and profile in transaction
-	userID := uuid.New()
-	profileID := uuid.New()
-
-	err = h.db.Transaction(func(tx *gorm.DB) error {
-		// Create user
-		hashedPwd := string(hashedPassword)
-		user := model.User{
-			ID:       userID,
-			Email:    req.Email,
-			Name:     req.Name,
-			Password: &hashedPwd,
-			Source:   "EMAIL",
-		}
-
-		if err := tx.Create(&user).Error; err != nil {
-			return err
-		}
-
-		// Create profile
-		profile := model.Profile{
-			ID:       profileID,
-			UserID:   userID,
-			Username: req.Username,
-		}
-
-		return tx.Create(&profile).Error
+	result, err := h.userSvc.CreateEmailUser(r.Context(), service.CreateEmailUserInput{
+		Email:    req.Email,
+		Password: req.Password,
+		Name:     req.Name,
+		Username: req.Username,
 	})
-
 	if err != nil {
-		respondError(w, "Failed to create user", http.StatusInternalServerError)
-		return
+		switch {
+		case err == service.ErrUserAlreadyExists:
+			respondError(w, "User already exists", http.StatusConflict)
+			return
+		case err == service.ErrUsernameTaken:
+			respondError(w, "Username already exists", http.StatusConflict)
+			return
+		default:
+			respondError(w, "Failed to create user", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Generate JWT token
-	token, err := h.jwtConfig.GenerateToken(userID, "omnivore_user")
+	token, err := h.jwtConfig.GenerateToken(result.UserID, "omnivore_user")
 	if err != nil {
 		respondError(w, "Failed to generate token", http.StatusInternalServerError)
 		return
@@ -211,10 +182,10 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	// Return response
 	respondJSON(w, AuthResponse{
 		User: UserResponse{
-			ID:       userID.String(),
-			Email:    req.Email,
-			Name:     req.Name,
-			Username: req.Username,
+			ID:       result.UserID.String(),
+			Email:    result.Email,
+			Name:     result.Name,
+			Username: result.Username,
 		},
 		Token: token,
 	})

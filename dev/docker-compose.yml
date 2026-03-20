@@ -36,11 +36,9 @@ services:
     env_file:
       - .env
 
-  migrate:
-    image: "ghcr.io/omnivore-app/sh-migrate:latest"
-    command: '/bin/bash /setup_db.bash'
-    volumes:
-      - ../setup_db.bash:/setup_db.bash
+  bootstrap:
+    <<: *omnivore-go
+    entrypoint: ["/bin/sh", "/app/bootstrap-db.sh"]
     env_file:
       - .env
     depends_on:
@@ -63,7 +61,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      bootstrap:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1"]

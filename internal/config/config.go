@@ -162,7 +162,7 @@ func loadAPIConfig() APIConfig {
 
 		MaxFeedFetchFailures: envInt("MAX_FEED_FETCH_FAILURES", 10),
 
-		DatabaseURL: buildDatabaseURL(),
+		DatabaseURL: BuildDatabaseURL(),
 	}
 }
 
@@ -231,7 +231,7 @@ func envInt(key string, def int) int {
 	return def
 }
 
-func buildDatabaseURL() string {
+func BuildDatabaseURL() string {
 	if v := os.Getenv("DATABASE_URL"); v != "" {
 		return v
 	}

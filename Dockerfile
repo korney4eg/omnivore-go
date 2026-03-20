@@ -26,6 +26,7 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/ap
       nss@edge \
       libstdc++@edge \
       sqlite-libs@edge \
+      postgresql-client \
       ca-certificates@edge \
  && rm -rf /var/cache/apk/*
 
@@ -38,9 +39,11 @@ ENV PORT=8080
 RUN wget -q -O /etc/hosts.blocklist https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
 
 COPY --from=build /app/omnivore .
+COPY --from=build /app/migrations ./migrations
+COPY --from=build /app/bootstrap-db.sh ./bootstrap-db.sh
 
 RUN printf '#!/bin/sh\ncat /etc/hosts.blocklist >> /etc/hosts\nexec "$@"\n' > /entrypoint.sh \
- && chmod +x /entrypoint.sh
+ && chmod +x /entrypoint.sh /app/bootstrap-db.sh
 
 EXPOSE 8080
 
